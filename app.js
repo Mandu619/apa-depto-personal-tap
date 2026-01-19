@@ -1,6 +1,6 @@
 /******************************************************
  * APA - Sistema de Registros (TAP)
- * app.js FINAL COMPLETO (sin utils.js)
+ * app.js FINAL (APP.HTML) - SIN LOGIN
  *
  * Requisitos:
  * - firebase.js debe exportar: auth, db, secondaryAuth
@@ -11,7 +11,6 @@
 import { auth, db, secondaryAuth } from "./firebase.js";
 
 import {
-  signInWithEmailAndPassword,
   onAuthStateChanged,
   signOut,
   createUserWithEmailAndPassword,
@@ -34,7 +33,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 /* =====================================================
-   Utils internos (no depende de utils.js)
+   Utils internos
 ===================================================== */
 const $ = (id) => document.getElementById(id);
 const qsa = (sel) => Array.from(document.querySelectorAll(sel));
@@ -114,7 +113,6 @@ function toCSV(rows, headers) {
     }
     return s;
   }
-
   const head = headers.join(",");
   const body = rows
     .map((r) => headers.map((h) => esc(r[h])).join(","))
@@ -176,31 +174,10 @@ function isAdmin() {
 /* =====================================================
    UI: mostrar/ocultar
 ===================================================== */
-function showLoginOnly() {
-  const loginWrap = $("loginWrap");
-  if (loginWrap) loginWrap.hidden = false;
-
-  if (navTabs) navTabs.hidden = true;
-  if (appShell) appShell.hidden = true;
-
-  views.forEach((v) => (v.hidden = true));
-
-  if (btnLogout) btnLogout.disabled = true;
-  if (userName) userName.textContent = "No autenticado";
-  if (userRole) userRole.textContent = "—";
-
-  scrollTopInstant();
-}
-
 function showAppOnly() {
-  const loginWrap = $("loginWrap");
-  if (loginWrap) loginWrap.hidden = true;
-
   if (navTabs) navTabs.hidden = false;
   if (appShell) appShell.hidden = false;
-
   if (btnLogout) btnLogout.disabled = false;
-
   scrollTopInstant();
 }
 
@@ -242,18 +219,9 @@ function applyRoleToUI() {
 }
 
 /* =====================================================
-   Password toggles
+   Password toggles (solo EMPLEADO)
 ===================================================== */
 function setupPasswordToggles() {
-  on("btnTogglePassword", "click", () => {
-    const input = $("loginPassword");
-    const btn = $("btnTogglePassword");
-    if (!input || !btn) return;
-    const isPwd = input.type === "password";
-    input.type = isPwd ? "text" : "password";
-    btn.textContent = isPwd ? "🙈" : "👁️";
-  });
-
   on("btnToggleEmpPass", "click", () => {
     const input = $("empPass");
     const btn = $("btnToggleEmpPass");
@@ -261,6 +229,21 @@ function setupPasswordToggles() {
     const isPwd = input.type === "password";
     input.type = isPwd ? "text" : "password";
     btn.textContent = isPwd ? "🙈" : "👁️";
+  });
+}
+
+/* =====================================================
+   LOGOUT (Salir) - FIX REAL
+===================================================== */
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.warn("Logout warning:", e);
+    } finally {
+      window.location.replace("./index.html");
+    }
   });
 }
 
@@ -360,83 +343,22 @@ async function loadUserProfile(uid) {
 }
 
 /* =====================================================
-   LOGIN / LOGOUT
-===================================================== */
-on("btnLogin", "click", async () => {
-  const email = ($("loginEmail") ? $("loginEmail").value : "").trim();
-  const password = $("loginPassword") ? $("loginPassword").value : "";
-  const msg = $("loginMsg");
-
-  setMsg(msg, "");
-
-  if (!email || !password) {
-    setMsg(msg, "Debes ingresar correo y contraseña.", "warn");
-    return;
-  }
-
-  setMsg(msg, "Verificando credenciales...", "info");
-
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-    setMsg(msg, "✅ Ingreso exitoso. Cargando...", "ok");
-  } catch (err) {
-    console.error(err);
-    const code = err && err.code ? err.code : "";
-
-    if (code.indexOf("auth/invalid-credential") >= 0 || code.indexOf("auth/wrong-password") >= 0) {
-      setMsg(msg, "❌ Correo o contraseña incorrectos.", "bad");
-    } else if (code.indexOf("auth/user-not-found") >= 0) {
-      setMsg(msg, "❌ No existe un usuario con ese correo.", "bad");
-    } else if (code.indexOf("auth/unauthorized-domain") >= 0) {
-      setMsg(msg, "❌ Dominio no autorizado. Agrega 'mandu619.github.io' en Firebase Auth → Authorized domains.", "bad");
-    } else if (code.indexOf("auth/too-many-requests") >= 0) {
-      setMsg(msg, "⚠️ Demasiados intentos. Espera un momento y prueba otra vez.", "warn");
-    } else {
-      setMsg(msg, "❌ Error al ingresar. Revisa consola y configuración Firebase.", "bad");
-    }
-  }
-});
-
-// Logout (Salir) -> cierra sesión y vuelve al login
-const btnLogout = document.getElementById("btnLogout");
-if (btnLogout) {
-  btnLogout.addEventListener("click", async () => {
-    try {
-      const { auth } = await import("./firebase.js");
-      const { signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
-      await signOut(auth);
-    } catch (e) {
-      console.warn("Logout warning:", e);
-    } finally {
-      // vuelve al login sí o sí
-      window.location.replace("./index.html");
-    }
-  });
-}
-
-
-/* =====================================================
-   AUTH STATE
+   AUTH STATE (si no hay sesión -> login)
 ===================================================== */
 onAuthStateChanged(auth, async (u) => {
   currentUser = u;
 
   if (!u) {
-    currentUserProfile = null;
-    showLoginOnly();
-    setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
+    window.location.replace("./index.html");
     return;
   }
 
   currentUserProfile = await loadUserProfile(u.uid);
 
   if (!currentUserProfile) {
-    showLoginOnly();
-    setMsg(
-      $("loginMsg"),
-      "⚠️ Usuario existe en Authentication, pero falta su perfil en Firestore: users/{uid}. (Debe crearlo el admin).",
-      "warn"
-    );
+    alert("Usuario existe en Auth, pero falta perfil en Firestore (users/{uid}). Debe crearlo Admin.");
+    await signOut(auth);
+    window.location.replace("./index.html");
     return;
   }
 
@@ -446,7 +368,6 @@ onAuthStateChanged(auth, async (u) => {
   showAppOnly();
   applyRoleToUI();
 
-  // Cargar todo y luego refrescar pantallas
   await preloadAll();
   fillWorkersUIFromEmployees();
   await refreshEntryDropdowns();
@@ -556,12 +477,12 @@ on("formEntry", "submit", async (e) => {
 
   try {
     await addDoc(collection(db, "entries"), {
-      dateISO: dateISO,
+      dateISO,
       dateTS: parseDateToTs(dateISO),
-      type: type,
-      desc: desc,
-      ref: ref,
-      qty: qty,
+      type,
+      desc,
+      ref,
+      qty,
       available: qty,
       createdBy: currentUser.uid,
       createdByName: currentUserProfile.name || currentUser.email || "Usuario",
@@ -634,8 +555,8 @@ async function refreshEntryDropdowns() {
     .filter((e) => safeNum(e.available) > 0);
 
   function opt(e) {
-    const label = (e.type || "") + " · " + (e.desc || "") + " (Disp: " + String(e.available || 0) + ")";
-    return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(label) + "</option>";
+    const label = `${e.type || ""} · ${e.desc || ""} (Disp: ${String(e.available || 0)})`;
+    return `<option value="${escapeHtml(e.id)}">${escapeHtml(label)}</option>`;
   }
 
   const html = '<option value="">Seleccionar…</option>' + list.map(opt).join("");
@@ -687,15 +608,15 @@ on("formAssign", "submit", async (e) => {
       const assignRef = doc(collection(db, "assignments"));
 
       tx.set(assignRef, {
-        dateISO: dateISO,
+        dateISO,
         dateTS: parseDateToTs(dateISO),
-        worker: worker,
-        qty: qty,
-        entryId: entryId,
+        worker,
+        qty,
+        entryId,
         entryLabel: label,
         entryType: entry.type || "",
         entryDesc: entry.desc || "",
-        reason: reason,
+        reason,
         createdBy: currentUser.uid,
         createdByName: currentUserProfile.name || currentUser.email || "Usuario",
         createdAt: serverTimestamp()
@@ -714,7 +635,7 @@ on("formAssign", "submit", async (e) => {
     await refreshDashboard();
   } catch (err) {
     console.error(err);
-    if (String(err.message).indexOf("NO_STOCK") >= 0) {
+    if (String(err.message).includes("NO_STOCK")) {
       setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
       setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
@@ -741,7 +662,7 @@ async function refreshAssignments() {
     if (!withinRange(safeNum(a.dateTS), fromISO, toISO)) return false;
     if (workerFilter) {
       const hay = (a.worker || "").toLowerCase();
-      if (hay.indexOf(workerFilter) < 0) return false;
+      if (!hay.includes(workerFilter)) return false;
     }
     return true;
   });
@@ -809,14 +730,14 @@ on("formScrap", "submit", async (e) => {
       const scrapRef = doc(collection(db, "scrap"));
 
       tx.set(scrapRef, {
-        dateISO: dateISO,
+        dateISO,
         dateTS: parseDateToTs(dateISO),
-        entryId: entryId,
+        entryId,
         entryLabel: label,
         entryType: entry.type || "",
         entryDesc: entry.desc || "",
-        qty: qty,
-        reason: reason,
+        qty,
+        reason,
         detail: reason === "Otro" ? detail : "",
         createdBy: currentUser.uid,
         createdByName: currentUserProfile.name || currentUser.email || "Usuario",
@@ -836,7 +757,7 @@ on("formScrap", "submit", async (e) => {
     await refreshDashboard();
   } catch (err) {
     console.error(err);
-    if (String(err.message).indexOf("NO_STOCK") >= 0) {
+    if (String(err.message).includes("NO_STOCK")) {
       setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
       setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
@@ -871,7 +792,6 @@ async function refreshScrap() {
 
 /* =====================================================
    SOLICITUDES
-   - incluye tipo "Solicitud"
 ===================================================== */
 function ensureRequestTypeHasSolicitud() {
   const sel = $("reqType");
@@ -902,9 +822,9 @@ on("formRequest", "submit", async (e) => {
 
   try {
     await addDoc(collection(db, "requests"), {
-      type: type,
-      text: text,
-      priority: priority,
+      type,
+      text,
+      priority,
       status: "Pendiente",
       response: "",
       createdBy: currentUser.uid,
@@ -945,7 +865,7 @@ async function refreshRequests() {
     if (statusFilter && status !== statusFilter) return false;
 
     const hay = ((r.type || "") + " " + (r.text || "")).toLowerCase();
-    if (textFilter && hay.indexOf(textFilter) < 0) return false;
+    if (textFilter && !hay.includes(textFilter)) return false;
 
     return true;
   });
@@ -1012,9 +932,6 @@ async function answerRequest(requestId) {
 
 /* =====================================================
    INFORMES
-   - Selección trabajador desde employees
-   - Incluye mermas
-   - Total merma + stock restante total
 ===================================================== */
 on("btnRunReport", "click", async () => {
   await runReport();
@@ -1022,7 +939,6 @@ on("btnRunReport", "click", async () => {
 
 on("btnExportCSV", "click", () => {
   if (!reportRows.length) return;
-
   const headers = ["Fecha", "TipoMov", "TipoEntrada", "Trabajador", "Entrada", "Descripcion", "Cantidad", "Motivo"];
   const csv = toCSV(reportRows, headers);
   downloadText("reporte_apa.csv", csv, "text/csv");
@@ -1047,7 +963,6 @@ async function runReport() {
 
   const rows = [];
 
-  // Asignaciones
   assignmentsCache.forEach((a) => {
     const ts = safeNum(a.dateTS);
     if (!withinRange(ts, fromISO, toISO)) return;
@@ -1055,12 +970,12 @@ async function runReport() {
     if (mode === "worker") {
       if (effectiveFilter) {
         const hay = (a.worker || "").toLowerCase();
-        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
+        if (!hay.includes(effectiveFilter.toLowerCase())) return;
       }
     } else {
       if (effectiveFilter) {
         const hay = (a.entryType || "").toLowerCase();
-        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
+        if (!hay.includes(effectiveFilter.toLowerCase())) return;
       }
     }
 
@@ -1076,7 +991,6 @@ async function runReport() {
     });
   });
 
-  // Mermas
   scrapCache.forEach((s) => {
     const ts = safeNum(s.dateTS);
     if (!withinRange(ts, fromISO, toISO)) return;
@@ -1084,10 +998,9 @@ async function runReport() {
     if (mode !== "worker") {
       if (effectiveFilter) {
         const hay = (s.entryType || "").toLowerCase();
-        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
+        if (!hay.includes(effectiveFilter.toLowerCase())) return;
       }
     } else {
-      // En modo worker, merma no tiene trabajador -> se incluye solo si no hay filtro
       if (effectiveFilter) return;
     }
 
@@ -1122,7 +1035,7 @@ async function runReport() {
   const btnCSV = $("btnExportCSV");
   if (btnCSV) btnCSV.disabled = rows.length === 0;
 
-  setMsg(msg, "✅ Informe listo (" + String(totalCount) + " registros).", "ok");
+  setMsg(msg, `✅ Informe listo (${totalCount} registros).`, "ok");
 }
 
 function renderReportTable(rows) {
@@ -1151,8 +1064,6 @@ function renderReportTable(rows) {
 
 /* =====================================================
    EMPLEADOS (ADMIN)
-   - Crea usuario en Auth con secondaryAuth
-   - Guarda en employees/{uid} y users/{uid}
 ===================================================== */
 on("btnCreateEmployee", "click", async () => {
   const msg = $("empMsg");
@@ -1164,11 +1075,7 @@ on("btnCreateEmployee", "click", async () => {
   }
 
   if (!secondaryAuth) {
-    setMsg(
-      msg,
-      "❌ secondaryAuth no está disponible. Revisa firebase.js (debe exportar secondaryAuth).",
-      "bad"
-    );
+    setMsg(msg, "❌ secondaryAuth no disponible. Revisa firebase.js.", "bad");
     return;
   }
 
@@ -1188,44 +1095,31 @@ on("btnCreateEmployee", "click", async () => {
 
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
-
-    try {
-      await updateProfile(cred.user, { displayName: first + " " + last });
-    } catch (e) {
-      // no bloquea
-    }
+    try { await updateProfile(cred.user, { displayName: `${first} ${last}` }); } catch {}
 
     const uid = cred.user.uid;
-    const fullName = first + " " + last;
+    const fullName = `${first} ${last}`;
 
     setMsg(msg, "Guardando perfil en Firestore...", "info");
 
     await setDoc(doc(db, "employees", uid), {
-      uid: uid,
-      first: first,
-      last: last,
+      uid,
+      first,
+      last,
       name: fullName,
-      email: email,
+      email,
       role: r,
-      active: active,
+      active,
       createdBy: currentUser.uid,
       createdByName: currentUserProfile.name || currentUser.email || "Usuario",
       createdAt: serverTimestamp()
     });
 
     await setDoc(doc(db, "users", uid), {
-      first: first,
-      last: last,
-      name: fullName,
-      email: email,
-      role: r,
-      active: active
+      first, last, name: fullName, email, role: r, active
     });
 
-    if ($("empFirst")) $("empFirst").value = "";
-    if ($("empLast")) $("empLast").value = "";
-    if ($("empEmail")) $("empEmail").value = "";
-    if ($("empPass")) $("empPass").value = "";
+    ["empFirst","empLast","empEmail","empPass"].forEach((id) => { if ($(id)) $(id).value = ""; });
     if ($("empRole")) $("empRole").value = "consulta";
     if ($("empActive")) $("empActive").value = "true";
 
@@ -1236,10 +1130,10 @@ on("btnCreateEmployee", "click", async () => {
   } catch (err) {
     console.error(err);
     const code = err && err.code ? err.code : "";
-    if (code.indexOf("auth/email-already-in-use") >= 0) {
+    if (code.includes("auth/email-already-in-use")) {
       setMsg(msg, "❌ Ese correo ya está registrado.", "bad");
     } else {
-      setMsg(msg, "❌ Error al crear empleado (" + (code || "desconocido") + ").", "bad");
+      setMsg(msg, `❌ Error al crear empleado (${code || "desconocido"}).`, "bad");
     }
   }
 });
@@ -1268,7 +1162,7 @@ function renderEmployeesTable() {
   employeesCache.forEach((e) => {
     const tr = document.createElement("tr");
     tr.innerHTML =
-      "<td>" + escapeHtml(e.name || ((e.first || "") + " " + (e.last || ""))) + "</td>" +
+      "<td>" + escapeHtml(e.name || `${e.first || ""} ${e.last || ""}`) + "</td>" +
       "<td>" + escapeHtml(e.email || "") + "</td>" +
       "<td>" + escapeHtml(e.role || "") + "</td>" +
       "<td>" + (e.active === false ? "No" : "Sí") + "</td>";
@@ -1286,18 +1180,14 @@ function fillWorkersUIFromEmployees() {
   if (selAssign) {
     selAssign.innerHTML =
       '<option value="">(Seleccionar trabajador)</option>' +
-      active
-        .map((e) => '<option value="' + escapeHtml(e.name) + '">' + escapeHtml(e.name) + "</option>")
-        .join("");
+      active.map((e) => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
   }
 
   const selReport = $("reportWorkerSelect");
   if (selReport) {
     selReport.innerHTML =
       '<option value="">(Todos / sin filtro)</option>' +
-      active
-        .map((e) => '<option value="' + escapeHtml(e.name) + '">' + escapeHtml(e.name) + "</option>")
-        .join("");
+      active.map((e) => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
   }
 }
 
@@ -1305,21 +1195,15 @@ function fillWorkersUIFromEmployees() {
    BOOT
 ===================================================== */
 (function boot() {
-  console.log("[APA] app.js FINAL COMPLETO cargado OK");
+  console.log("[APA] app.js cargado OK");
   setupPasswordToggles();
-  showLoginOnly();
-  setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
 
   // Fechas por defecto si existen
-  const ids = ["entryDate", "assignDate", "scrapDate"];
-  ids.forEach((id) => {
+  ["entryDate","assignDate","scrapDate"].forEach((id) => {
     const el = $(id);
     if (el) el.value = todayISO();
   });
 
-  // Asegurar que reqType tenga "Solicitud" al cargar
+  // Asegurar que reqType tenga "Solicitud"
   ensureRequestTypeHasSolicitud();
 })();
-
-
-
