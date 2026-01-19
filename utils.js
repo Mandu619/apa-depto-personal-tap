@@ -1,52 +1,45 @@
-export function nowTs() {
-  return Date.now();
+export const $ = (id) => document.getElementById(id);
+
+export function setMsg(el, text = "", cls = "") {
+  if (!el) return;
+  el.classList.remove("ok", "warn", "bad", "info");
+  if (cls) el.classList.add(cls);
+  el.textContent = text || "";
 }
 
 export function todayISO() {
-  return new Date().toISOString().slice(0,10);
+  const d = new Date();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-export function setMsg(el, text, type="info") {
-  if (!el) return;
-  el.textContent = text || "";
-  el.style.color =
-    type === "ok" ? "var(--ok)" :
-    type === "bad" ? "var(--bad)" :
-    type === "warn" ? "var(--warn)" :
-    "var(--muted)";
+export function safeNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
 }
 
-export function escapeHtml(str="") {
-  return str.replace(/[&<>"']/g, (m) => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"
-  }[m]));
+export function escapeHtml(s = "") {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-export function toCSV(rows, headers) {
-  const esc = (v) => `"${String(v ?? "").replace(/"/g,'""')}"`;
-  const lines = [];
-  lines.push(headers.map(esc).join(","));
-  for (const r of rows) {
-    lines.push(headers.map(h => esc(r[h])).join(","));
-  }
-  return lines.join("\n");
-}
+export function downloadCSV(filename, rows) {
+  const csv = rows.map(r => r.map(cell => {
+    const s = String(cell ?? "");
+    const needs = /[",\n]/.test(s);
+    return needs ? `"${s.replaceAll('"', '""')}"` : s;
+  }).join(",")).join("\n");
 
-export function downloadText(filename, content, mime="text/plain") {
-  const blob = new Blob([content], { type: mime });
-  const url = URL.createObjectURL(blob);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const a = document.createElement("a");
-  a.href = url;
+  a.href = URL.createObjectURL(blob);
   a.download = filename;
   document.body.appendChild(a);
   a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-export function parseDateToTs(isoDate) {
-  // isoDate: "YYYY-MM-DD"
-  if (!isoDate) return null;
-  const d = new Date(isoDate + "T00:00:00");
-  return d.getTime();
+  document.body.removeChild(a);
 }
