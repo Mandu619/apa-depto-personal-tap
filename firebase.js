@@ -1,6 +1,4 @@
-// firebase.js (compatible con GitHub Pages y ES Modules)
-// Exporta auth y db para que app.js funcione.
-
+// firebase.js (ES Modules + CDN) - Compatible con GitHub Pages
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
