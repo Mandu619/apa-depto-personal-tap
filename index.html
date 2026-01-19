@@ -3,11 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>APA • Depto. Personal • Sistema de Registros</title>
+  <title>Sistema de Registros | APA - Depto. Personal</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 
 <body>
+  <noscript>
+    <div class="noscript">
+      Esta aplicación requiere JavaScript habilitado para funcionar.
+    </div>
+  </noscript>
+
+  <!-- TOPBAR -->
   <header class="topbar">
     <div class="brand">
       <div class="logo">APA</div>
@@ -17,26 +24,29 @@
       </div>
     </div>
 
-    <div class="userbox" id="userBox" hidden>
+    <div class="userbox" id="userBox">
       <div class="user-meta">
-        <div class="user-name" id="userName">—</div>
+        <div class="user-name" id="userName">No autenticado</div>
         <div class="user-role" id="userRole">—</div>
       </div>
-      <button class="btn btn--danger" id="btnLogout" type="button">Salir</button>
+      <button class="btn btn--danger" id="btnLogout" type="button" disabled>Salir</button>
     </div>
   </header>
 
   <main class="container">
-    <!-- LOGIN (solo esto debe verse antes de iniciar sesión) -->
+
+    <!-- LOGIN (solo esto se ve sin sesión) -->
     <section class="login-wrap" id="loginWrap">
-      <section class="card login-card" id="loginCard">
+      <div class="card login-card" id="loginCard">
         <h2>Ingreso al sistema</h2>
-        <p class="muted">Acceso exclusivo para personal autorizado del Depto. Personal (APA).</p>
+        <p class="muted small">
+          Ingresa con el usuario creado en Firebase Authentication. Si no tienes acceso, solicita creación de cuenta al Administrador.
+        </p>
 
         <div class="grid2">
           <div>
             <label for="loginEmail">Correo</label>
-            <input id="loginEmail" type="email" placeholder="usuario@correo.com" autocomplete="username" />
+            <input id="loginEmail" type="email" placeholder="nombre@dominio.cl" autocomplete="username" />
           </div>
 
           <div>
@@ -49,55 +59,59 @@
         </div>
 
         <div class="row">
-          <button class="btn btn--primary" id="btnLogin" type="button">Ingresar</button>
-          <span class="muted small">Si dudas del usuario, revisa Firebase → Authentication → Users</span>
+          <button id="btnLogin" class="btn btn--primary" type="button">Ingresar</button>
+          <span class="muted small">Tip: si dudas del correo, revisa Firebase → Authentication → Users</span>
         </div>
 
-        <div id="loginMsg" class="msg" aria-live="polite"></div>
+        <div id="loginMsg" class="msg info">Ingresa tus credenciales para continuar.</div>
 
         <div class="login-foot muted small">
-          Soporte interno: Suboficial Rodrigo Arancibia • Maritza Aguila • Camila Catalán • Cabo Alonso Parraguez
+          MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
         </div>
-      </section>
+      </div>
     </section>
 
-    <!-- APP (NO debe verse antes de login) -->
+    <!-- APP SHELL (todo lo demás se oculta hasta logueo) -->
     <section class="app" id="appShell" hidden>
-      <nav class="nav">
-        <button class="tab is-active" data-tab="tabDashboard">Panel</button>
-        <button class="tab" data-tab="tabEntries">Entradas</button>
-        <button class="tab" data-tab="tabAssignments">Asignación</button>
-        <button class="tab" data-tab="tabScrap">Merma</button>
-        <button class="tab" data-tab="tabRequests">Solicitudes</button>
-        <button class="tab" data-tab="tabReports">Informes</button>
-        <button class="tab" data-tab="tabEmployees" id="tabEmployeesBtn" hidden>Empleados</button>
+
+      <!-- NAV TABS -->
+      <nav class="nav" id="navTabs" hidden>
+        <button class="tab active" data-view="view-dashboard" type="button">Panel</button>
+        <button class="tab" data-view="view-entries" type="button">Entradas</button>
+        <button class="tab" data-view="view-assign" type="button">Asignación</button>
+        <button class="tab" data-view="view-scrap" type="button">Merma</button>
+        <button class="tab" data-view="view-requests" type="button">Solicitudes</button>
+        <button class="tab" data-view="view-reports" type="button">Informes</button>
+
+        <!-- Solo admin (el JS lo oculta si no corresponde) -->
+        <button class="tab" data-view="view-employees" type="button" hidden>Empleados</button>
       </nav>
 
       <!-- DASHBOARD -->
-      <section class="card tabpage" id="tabDashboard">
+      <section class="card view" id="view-dashboard" hidden>
         <h2>Panel</h2>
 
         <div class="kpis">
           <div class="kpi">
             <div class="kpi-label">Entradas (últimos 30 días)</div>
-            <div class="kpi-value" id="kpiEntries">—</div>
+            <div class="kpi-value" id="kpiEntries">0</div>
           </div>
           <div class="kpi">
             <div class="kpi-label">Asignaciones (últimos 30 días)</div>
-            <div class="kpi-value" id="kpiAssignments">—</div>
+            <div class="kpi-value" id="kpiAssignments">0</div>
           </div>
           <div class="kpi">
             <div class="kpi-label">Mermas (últimos 30 días)</div>
-            <div class="kpi-value" id="kpiScrap">—</div>
+            <div class="kpi-value" id="kpiScrap">0</div>
           </div>
           <div class="kpi">
             <div class="kpi-label">Solicitudes pendientes</div>
-            <div class="kpi-value" id="kpiPending">—</div>
+            <div class="kpi-value" id="kpiPending">0</div>
           </div>
         </div>
 
-        <div class="grid2">
-          <div>
+        <div class="grid2" style="margin-top:12px;">
+          <div class="panel">
             <h3>Últimas entradas</h3>
             <div class="table-wrap">
               <table class="table" id="tblLastEntries">
@@ -115,7 +129,7 @@
             </div>
           </div>
 
-          <div>
+          <div class="panel">
             <h3>Últimas asignaciones</h3>
             <div class="table-wrap">
               <table class="table" id="tblLastAssignments">
@@ -133,405 +147,452 @@
           </div>
         </div>
 
-        <div class="msg" id="dashMsg"></div>
+        <div class="msg ok" id="dashMsg">Panel actualizado.</div>
       </section>
 
       <!-- ENTRADAS -->
-      <section class="card tabpage" id="tabEntries" hidden>
-        <h2>Entradas</h2>
-        <p class="muted">Registro de entradas con stock disponible.</p>
+      <section class="card view" id="view-entries" hidden>
+        <h2>Registro de Entradas</h2>
 
-        <div class="panel">
-          <h3>Nueva entrada</h3>
-
+        <form id="formEntry">
           <div class="grid2">
             <div>
-              <label for="entDate">Fecha</label>
-              <input id="entDate" type="date" />
+              <label for="entryDate">Fecha</label>
+              <input id="entryDate" type="date" />
             </div>
             <div>
-              <label for="entType">Tipo</label>
-              <select id="entType">
-                <option value="Insumo">Insumo</option>
+              <label for="entryType">Tipo</label>
+              <select id="entryType">
+                <option value="">Seleccionar…</option>
                 <option value="EPP">EPP</option>
-                <option value="Documento">Documento</option>
+                <option value="Uniforme">Uniforme</option>
+                <option value="Oficina">Oficina</option>
+                <option value="Aseo">Aseo</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
+          </div>
 
+          <div class="grid2">
             <div>
-              <label for="entDesc">Descripción</label>
-              <input id="entDesc" type="text" placeholder="Ej: Guantes, carpeta, etc." />
+              <label for="entryDesc">Descripción</label>
+              <input id="entryDesc" type="text" placeholder="Ej: Guantes, Papel, Tóner..." />
             </div>
             <div>
-              <label for="entUnit">Unidad</label>
-              <input id="entUnit" type="text" placeholder="Ej: unidad, caja, pack" />
-            </div>
-
-            <div>
-              <label for="entQty">Cantidad</label>
-              <input id="entQty" type="number" min="1" step="1" placeholder="Ej: 10" />
-            </div>
-            <div>
-              <label for="entDoc">Documento/Referencia</label>
-              <input id="entDoc" type="text" placeholder="OC / Guía / Memo / etc." />
+              <label for="entryRef">Referencia (opcional)</label>
+              <input id="entryRef" type="text" placeholder="OC / Factura / Guía..." />
             </div>
           </div>
 
-          <div class="row">
-            <button class="btn btn--primary" id="btnSaveEntry" type="button">Guardar entrada</button>
-            <span class="muted small">Requiere rol: admin u operator</span>
+          <div class="grid2">
+            <div>
+              <label for="entryQty">Cantidad</label>
+              <input id="entryQty" type="number" min="1" step="1" />
+            </div>
+            <div class="row" style="justify-content:flex-end;">
+              <button class="btn btn--primary" type="submit">Guardar entrada</button>
+              <button class="btn btn--ghost" id="btnReloadEntries" type="button">Actualizar</button>
+            </div>
           </div>
 
-          <div class="msg" id="entMsg"></div>
-        </div>
+          <div id="entryMsg" class="msg"></div>
+        </form>
 
         <div class="panel">
-          <h3>Listado de entradas</h3>
-
-          <div class="row row--wrap">
-            <input id="entSearch" type="text" placeholder="Buscar por texto..." />
-            <select id="entFilterType">
-              <option value="">Todos los tipos</option>
-              <option value="Insumo">Insumo</option>
-              <option value="EPP">EPP</option>
-              <option value="Documento">Documento</option>
-              <option value="Otro">Otro</option>
-            </select>
-            <button class="btn btn--ghost" id="btnReloadEntries" type="button">Actualizar</button>
+          <div class="grid2">
+            <div>
+              <label for="filterEntryType">Filtro por tipo</label>
+              <select id="filterEntryType">
+                <option value="">(Todos)</option>
+                <option value="EPP">EPP</option>
+                <option value="Uniforme">Uniforme</option>
+                <option value="Oficina">Oficina</option>
+                <option value="Aseo">Aseo</option>
+                <option value="Otro">Otro</option>
+              </select>
+            </div>
+            <div>
+              <label for="filterEntryText">Buscar</label>
+              <input id="filterEntryText" type="text" placeholder="Descripción / referencia..." />
+            </div>
           </div>
 
-          <div class="table-wrap">
+          <div class="table-wrap" style="margin-top:12px;">
             <table class="table" id="tblEntries">
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Tipo</th>
                   <th>Descripción</th>
-                  <th>Unidad</th>
-                  <th class="right">Cantidad</th>
-                  <th class="right">Disponible</th>
                   <th>Ref.</th>
+                  <th class="right">Cant.</th>
+                  <th class="right">Disp.</th>
+                  <th>Creado por</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-
-          <div class="msg" id="entListMsg"></div>
         </div>
       </section>
 
-      <!-- ASIGNACIONES -->
-      <section class="card tabpage" id="tabAssignments" hidden>
-        <h2>Asignación a trabajador</h2>
-        <p class="muted">Asigna un ítem a un trabajador. Descuenta stock disponible.</p>
+      <!-- ASIGNACION -->
+      <section class="card view" id="view-assign" hidden>
+        <h2>Asignación a Trabajador</h2>
 
-        <div class="panel">
-          <h3>Nueva asignación</h3>
+        <form id="formAssign">
+          <div class="grid2">
+            <div>
+              <label for="assignDate">Fecha</label>
+              <input id="assignDate" type="date" />
+            </div>
+            <div>
+              <label for="assignEntryId">Ítem (desde entradas)</label>
+              <select id="assignEntryId">
+                <option value="">Seleccionar…</option>
+              </select>
+            </div>
+          </div>
 
           <div class="grid2">
             <div>
-              <label for="asEntry">Entrada (ítem)</label>
-              <select id="asEntry"></select>
+              <label for="assignWorkerSelect">Trabajador (desde base de datos)</label>
+              <select id="assignWorkerSelect">
+                <option value="">(Seleccionar trabajador)</option>
+              </select>
+              <div class="muted small">Si no aparece, el admin debe crear empleados en la pestaña “Empleados”.</div>
             </div>
             <div>
-              <label for="asDate">Fecha</label>
-              <input id="asDate" type="date" />
+              <label for="assignWorker">Trabajador (manual, opcional)</label>
+              <input id="assignWorker" type="text" placeholder="Ej: Cabo Alonso Parraguez" />
             </div>
+          </div>
 
+          <div class="grid2">
             <div>
-              <label for="asWorkerSelect">Trabajador (desde base)</label>
-              <select id="asWorkerSelect"></select>
-              <div class="muted small">Si no aparece, créalo en “Empleados” (solo admin).</div>
+              <label for="assignQty">Cantidad</label>
+              <input id="assignQty" type="number" min="1" step="1" />
             </div>
-
             <div>
-              <label for="asQty">Cantidad asignada</label>
-              <input id="asQty" type="number" min="1" step="1" placeholder="Ej: 2" />
-            </div>
-
-            <div class="span2">
-              <label for="asReason">Motivo / Observación</label>
-              <input id="asReason" type="text" placeholder="Ej: Entrega de EPP para actividad X" />
+              <label for="assignReason">Motivo</label>
+              <input id="assignReason" type="text" placeholder="Ej: Entrega EPP / Necesidad operativa..." />
             </div>
           </div>
 
           <div class="row">
-            <button class="btn btn--primary" id="btnSaveAssign" type="button">Guardar asignación</button>
-            <span class="muted small">Requiere rol: admin u operator</span>
-          </div>
-
-          <div class="msg" id="asMsg"></div>
-        </div>
-
-        <div class="panel">
-          <h3>Listado de asignaciones</h3>
-
-          <div class="row row--wrap">
-            <input id="asSearch" type="text" placeholder="Buscar trabajador o descripción..." />
+            <button class="btn btn--primary" type="submit">Guardar asignación</button>
             <button class="btn btn--ghost" id="btnReloadAssignments" type="button">Actualizar</button>
           </div>
 
-          <div class="table-wrap">
+          <div id="assignMsg" class="msg"></div>
+        </form>
+
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <label for="filterAssignWorker">Buscar trabajador</label>
+              <input id="filterAssignWorker" type="text" placeholder="Nombre..." />
+            </div>
+            <div class="grid2">
+              <div>
+                <label for="filterAssignFrom">Desde</label>
+                <input id="filterAssignFrom" type="date" />
+              </div>
+              <div>
+                <label for="filterAssignTo">Hasta</label>
+                <input id="filterAssignTo" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top:12px;">
             <table class="table" id="tblAssignments">
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Trabajador</th>
-                  <th>Ítem</th>
-                  <th class="right">Cantidad</th>
-                  <th>Motivo</th>
+                  <th>ID Entrada</th>
+                  <th>Tipo</th>
+                  <th>Descripción</th>
+                  <th class="right">Cant.</th>
+                  <th>Creado por</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
 
-          <div class="msg" id="asListMsg"></div>
+          <div id="assignListMsg" class="msg"></div>
         </div>
       </section>
 
       <!-- MERMA -->
-      <section class="card tabpage" id="tabScrap" hidden>
-        <h2>Registro de merma</h2>
-        <p class="muted">Registra una merma y descuenta stock disponible.</p>
+      <section class="card view" id="view-scrap" hidden>
+        <h2>Registro de Merma</h2>
 
-        <div class="panel">
-          <h3>Nueva merma</h3>
+        <form id="formScrap">
+          <div class="grid2">
+            <div>
+              <label for="scrapDate">Fecha</label>
+              <input id="scrapDate" type="date" />
+            </div>
+            <div>
+              <label for="scrapEntryId">Ítem (desde entradas)</label>
+              <select id="scrapEntryId">
+                <option value="">Seleccionar…</option>
+              </select>
+            </div>
+          </div>
 
           <div class="grid2">
             <div>
-              <label for="scEntry">Entrada (ítem)</label>
-              <select id="scEntry"></select>
+              <label for="scrapQty">Cantidad</label>
+              <input id="scrapQty" type="number" min="1" step="1" />
             </div>
             <div>
-              <label for="scDate">Fecha</label>
-              <input id="scDate" type="date" />
-            </div>
-
-            <div>
-              <label for="scQty">Cantidad</label>
-              <input id="scQty" type="number" min="1" step="1" placeholder="Ej: 1" />
-            </div>
-            <div>
-              <label for="scReason">Motivo</label>
-              <select id="scReason">
-                <option value="Deterioro">Deterioro</option>
+              <label for="scrapReason">Motivo</label>
+              <select id="scrapReason">
+                <option value="">Seleccionar…</option>
                 <option value="Vencimiento">Vencimiento</option>
+                <option value="Daño">Daño</option>
                 <option value="Pérdida">Pérdida</option>
                 <option value="Otro">Otro</option>
               </select>
             </div>
+          </div>
 
-            <div class="span2">
-              <label for="scDetail">Detalle (si motivo = "Otro")</label>
-              <input id="scDetail" type="text" placeholder="Explica el motivo..." />
-            </div>
+          <div>
+            <label for="scrapDetail">Detalle (solo si motivo = "Otro")</label>
+            <input id="scrapDetail" type="text" placeholder="Describe el motivo..." />
           </div>
 
           <div class="row">
-            <button class="btn btn--primary" id="btnSaveScrap" type="button">Guardar merma</button>
-            <span class="muted small">Requiere rol: admin u operator</span>
+            <button class="btn btn--primary" type="submit">Guardar merma</button>
           </div>
 
-          <div class="msg" id="scMsg"></div>
-        </div>
+          <div id="scrapMsg" class="msg"></div>
+        </form>
 
         <div class="panel">
-          <h3>Listado de mermas</h3>
-
-          <div class="row row--wrap">
-            <input id="scSearch" type="text" placeholder="Buscar motivo o descripción..." />
-            <button class="btn btn--ghost" id="btnReloadScrap" type="button">Actualizar</button>
-          </div>
-
           <div class="table-wrap">
             <table class="table" id="tblScrap">
               <thead>
                 <tr>
                   <th>Fecha</th>
-                  <th>Ítem</th>
-                  <th class="right">Cantidad</th>
+                  <th>ID Entrada</th>
+                  <th>Tipo</th>
+                  <th>Descripción</th>
+                  <th class="right">Cant.</th>
                   <th>Motivo</th>
-                  <th>Detalle</th>
+                  <th>Creado por</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-
-          <div class="msg" id="scListMsg"></div>
         </div>
       </section>
 
       <!-- SOLICITUDES -->
-      <section class="card tabpage" id="tabRequests" hidden>
-        <h2>Solicitudes / Consultas vía web</h2>
-        <p class="muted">Cualquier usuario autenticado puede registrar solicitudes. Admin/Operator puede responder.</p>
+      <section class="card view" id="view-requests" hidden>
+        <h2>Solicitudes</h2>
 
-        <div class="panel">
-          <h3>Nueva solicitud</h3>
-
+        <form id="formRequest">
           <div class="grid2">
             <div>
-              <label for="rqType">Tipo</label>
-              <select id="rqType">
-                <option value="Solicitud">Solicitud</option>
+              <label for="reqType">Tipo</label>
+              <select id="reqType">
+                <option value="">Seleccionar…</option>
                 <option value="Consulta">Consulta</option>
-                <option value="Reporte">Reporte</option>
-                <option value="Corrección">Corrección</option>
-                <option value="Otro">Otro</option>
+                <option value="Requerimiento">Requerimiento</option>
+                <option value="Incidente">Incidente</option>
+                <option value="Solicitud">Solicitud</option>
               </select>
             </div>
             <div>
-              <label for="rqPriority">Prioridad</label>
-              <select id="rqPriority">
-                <option value="Baja">Baja</option>
-                <option value="Media">Media</option>
+              <label for="reqPriority">Prioridad</label>
+              <select id="reqPriority">
+                <option value="Normal">Normal</option>
                 <option value="Alta">Alta</option>
               </select>
             </div>
+          </div>
 
-            <div class="span2">
-              <label for="rqDetail">Detalle</label>
-              <input id="rqDetail" type="text" placeholder="Describe la solicitud..." />
-            </div>
+          <div>
+            <label for="reqText">Detalle</label>
+            <input id="reqText" type="text" placeholder="Describe tu solicitud..." />
           </div>
 
           <div class="row">
-            <button class="btn btn--primary" id="btnSaveRequest" type="button">Enviar solicitud</button>
-          </div>
-
-          <div class="msg" id="rqMsg"></div>
-        </div>
-
-        <div class="panel">
-          <h3>Listado de solicitudes</h3>
-
-          <div class="row row--wrap">
-            <select id="rqFilterStatus">
-              <option value="">Todos</option>
-              <option value="Pendiente">Pendiente</option>
-              <option value="Respondida">Respondida</option>
-            </select>
+            <button class="btn btn--primary" type="submit">Crear solicitud</button>
             <button class="btn btn--ghost" id="btnReloadRequests" type="button">Actualizar</button>
           </div>
 
-          <div class="table-wrap">
+          <div id="reqMsg" class="msg"></div>
+        </form>
+
+        <div class="panel">
+          <div class="grid2">
+            <div>
+              <label for="filterReqStatus">Estado</label>
+              <select id="filterReqStatus">
+                <option value="">(Todos)</option>
+                <option value="Pendiente">Pendiente</option>
+                <option value="Respondida">Respondida</option>
+              </select>
+            </div>
+            <div>
+              <label for="filterReqText">Buscar</label>
+              <input id="filterReqText" type="text" placeholder="Tipo / detalle..." />
+            </div>
+          </div>
+
+          <div class="table-wrap" style="margin-top:12px;">
             <table class="table" id="tblRequests">
               <thead>
                 <tr>
                   <th>Fecha</th>
                   <th>Tipo</th>
-                  <th>Prioridad</th>
                   <th>Detalle</th>
+                  <th>Prioridad</th>
                   <th>Estado</th>
                   <th>Respuesta</th>
-                  <th class="right">Acción</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
 
-          <div class="msg" id="rqListMsg"></div>
+          <div id="reqListMsg" class="msg"></div>
         </div>
       </section>
 
       <!-- INFORMES -->
-      <section class="card tabpage" id="tabReports" hidden>
+      <section class="card view" id="view-reports" hidden>
         <h2>Informes</h2>
-        <p class="muted">
-          Informes por trabajador / tipo, incluye mermas y resumen de stock total restante.
-        </p>
 
         <div class="panel">
-          <h3>Parámetros</h3>
-
           <div class="grid2">
             <div>
-              <label for="rpMode">Modo</label>
-              <select id="rpMode">
-                <option value="worker">Por trabajador (asignaciones)</option>
-                <option value="type">Por tipo (entradas/asignaciones/mermas)</option>
-                <option value="stock">Resumen de stock total (entradas - asignaciones - mermas)</option>
+              <label for="reportMode">Modo de reporte</label>
+              <select id="reportMode">
+                <option value="worker">Por trabajador</option>
+                <option value="type">Por tipo de entrada</option>
               </select>
             </div>
 
             <div>
-              <label for="rpWorkerSelect">Trabajador (desde base)</label>
-              <select id="rpWorkerSelect"></select>
-              <div class="muted small">Se carga desde colección <b>employees</b>.</div>
-            </div>
-
-            <div>
-              <label for="rpFrom">Desde (opcional)</label>
-              <input id="rpFrom" type="date" />
-            </div>
-            <div>
-              <label for="rpTo">Hasta (opcional)</label>
-              <input id="rpTo" type="date" />
+              <label for="reportWorkerSelect">Trabajador (desde base de datos)</label>
+              <select id="reportWorkerSelect">
+                <option value="">(Todos / sin filtro)</option>
+              </select>
+              <div class="muted small">Opcional: si no seleccionas, muestra todos.</div>
             </div>
           </div>
 
-          <div class="row">
-            <button class="btn btn--primary" id="btnRunReport" type="button">Generar informe</button>
-            <button class="btn btn--ghost" id="btnExportCSV" type="button" disabled>Exportar CSV</button>
+          <div class="grid2">
+            <div>
+              <label for="reportFilter">Filtro manual (opcional)</label>
+              <input id="reportFilter" type="text" placeholder="Ej: Maritza / EPP" />
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label for="reportFrom">Desde</label>
+                <input id="reportFrom" type="date" />
+              </div>
+              <div>
+                <label for="reportTo">Hasta</label>
+                <input id="reportTo" type="date" />
+              </div>
+            </div>
           </div>
 
-          <div class="msg" id="rpMsg"></div>
+          <div class="row row--wrap">
+            <button id="btnRunReport" class="btn btn--primary" type="button">Generar informe</button>
+            <button id="btnExportCSV" class="btn btn--ghost" type="button" disabled>Exportar CSV</button>
+          </div>
+
+          <div id="reportMsg" class="msg"></div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="kpi">
+              <div class="kpi-label">Registros</div>
+              <div class="kpi-value" id="reportCount">0</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Cantidad total (movimientos)</div>
+              <div class="kpi-value" id="reportQty">0</div>
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:10px;">
+            <div class="kpi">
+              <div class="kpi-label">Total merma (según filtro)</div>
+              <div class="kpi-value" id="reportScrapTotal">0</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Stock total restante (global)</div>
+              <div class="kpi-value" id="reportRemainingTotal">0</div>
+            </div>
+          </div>
         </div>
 
         <div class="panel">
-          <h3>Resultados</h3>
           <div class="table-wrap">
             <table class="table" id="tblReport">
               <thead>
                 <tr>
-                  <th>Concepto</th>
-                  <th class="right">Cantidad</th>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Trabajador</th>
+                  <th>ID Entrada</th>
+                  <th>Descripción</th>
+                  <th class="right">Cant.</th>
+                  <th>Motivo/Mov.</th>
                 </tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-
-          <div class="msg" id="rpSummaryMsg"></div>
         </div>
       </section>
 
-      <!-- EMPLEADOS (solo admin) -->
-      <section class="card tabpage" id="tabEmployees" hidden>
-        <h2>Empleados</h2>
-        <p class="muted">Solo Admin: crea empleados (Auth + Firestore) y asigna rol de acceso.</p>
+      <!-- EMPLEADOS (ADMIN) -->
+      <section class="card view" id="view-employees" hidden>
+        <h2>Gestión de Empleados (Admin)</h2>
+        <p class="muted small">
+          Crea usuarios del sistema. Se registran en Firebase Authentication y se guardan perfiles en Firestore (employees y users).
+        </p>
 
         <div class="panel">
-          <h3>Crear empleado</h3>
-
           <div class="grid2">
             <div>
               <label for="empFirst">Nombre</label>
-              <input id="empFirst" type="text" placeholder="Ej: Maritza" />
+              <input id="empFirst" type="text" placeholder="Ej: Rodrigo" />
             </div>
             <div>
               <label for="empLast">Apellidos</label>
-              <input id="empLast" type="text" placeholder="Ej: Aguila" />
+              <input id="empLast" type="text" placeholder="Ej: Arancibia" />
             </div>
+          </div>
 
+          <div class="grid2">
             <div>
               <label for="empEmail">Correo</label>
-              <input id="empEmail" type="email" placeholder="correo@dominio.com" />
+              <input id="empEmail" type="email" placeholder="correo@dominio.cl" />
             </div>
             <div>
-              <label for="empPass">Clave temporal</label>
+              <label for="empPass">Clave (mínimo 6)</label>
               <div class="password-wrap">
-                <input id="empPass" type="password" placeholder="Mínimo 6 caracteres" />
+                <input id="empPass" type="password" placeholder="••••••••" />
                 <button id="btnToggleEmpPass" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">👁️</button>
               </div>
-              <div class="muted small">La clave NO se guarda en Firestore. Solo se usa para crear el usuario.</div>
             </div>
+          </div>
 
+          <div class="grid2">
             <div>
               <label for="empRole">Rol</label>
               <select id="empRole">
@@ -541,28 +602,24 @@
               </select>
             </div>
             <div>
-              <label for="empActive">Estado</label>
+              <label for="empActive">Activo</label>
               <select id="empActive">
-                <option value="true">Activo</option>
-                <option value="false">Inactivo</option>
+                <option value="true">Sí</option>
+                <option value="false">No</option>
               </select>
             </div>
           </div>
 
-          <div class="row">
-            <button class="btn btn--primary" id="btnCreateEmployee" type="button">Crear empleado</button>
-            <span class="muted small">Se crea en Auth y se registra en Firestore (employees + users).</span>
+          <div class="row row--wrap">
+            <button id="btnCreateEmployee" class="btn btn--primary" type="button">Crear empleado</button>
+            <button id="btnReloadEmployees" class="btn btn--ghost" type="button">Actualizar listado</button>
           </div>
 
-          <div class="msg" id="empMsg"></div>
+          <div id="empMsg" class="msg"></div>
         </div>
 
         <div class="panel">
           <h3>Listado de empleados</h3>
-          <div class="row row--wrap">
-            <button class="btn btn--ghost" id="btnReloadEmployees" type="button">Actualizar</button>
-          </div>
-
           <div class="table-wrap">
             <table class="table" id="tblEmployees">
               <thead>
@@ -576,24 +633,20 @@
               <tbody></tbody>
             </table>
           </div>
-
-          <div class="msg" id="empListMsg"></div>
+          <div id="empListMsg" class="msg"></div>
         </div>
       </section>
 
-      <footer class="foot">
-        <div class="muted small">
-          MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
-        </div>
-      </footer>
+      <div class="foot muted small">
+        MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
+      </div>
+
     </section>
   </main>
 
-  <noscript>
-    <div class="noscript">Esta aplicación requiere JavaScript para funcionar.</div>
-  </noscript>
-
+  <!-- JS -->
   <script type="module" src="./app.js"></script>
 </body>
 </html>
+
 
