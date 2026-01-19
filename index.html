@@ -27,10 +27,11 @@
   </header>
 
   <main class="container">
-    <!-- LOGIN -->
-    <section class="card" id="loginCard">
+
+    <!-- LOGIN (lo único visible antes de loguear) -->
+    <section class="card login-card" id="loginCard">
       <h2>Ingreso al sistema</h2>
-      <p class="muted">Ingresa con el usuario creado en Firebase Authentication.</p>
+      <p class="muted">Acceso restringido. Usa tu cuenta institucional creada en Firebase Authentication.</p>
 
       <div class="grid2">
         <div>
@@ -49,13 +50,13 @@
 
       <div class="row">
         <button class="btn btn--primary" id="btnLogin" type="button">Ingresar</button>
-        <span class="muted small">Tip: si dudas del correo, revisa Firebase → Authentication → Users</span>
+        <span class="muted small">Si dudas del correo, revisa Firebase → Authentication → Users</span>
       </div>
 
       <div id="loginMsg" class="msg" aria-live="polite"></div>
     </section>
 
-    <!-- APP -->
+    <!-- APP (solo visible DESPUÉS de login) -->
     <section class="app" id="appShell" hidden>
       <nav class="nav">
         <button class="tab is-active" data-tab="tabDashboard">Panel</button>
@@ -64,11 +65,13 @@
         <button class="tab" data-tab="tabScrap">Merma</button>
         <button class="tab" data-tab="tabRequests">Solicitudes</button>
         <button class="tab" data-tab="tabReports">Informes</button>
+        <button class="tab admin-only" data-tab="tabEmployees" hidden>Empleados</button>
       </nav>
 
       <!-- DASHBOARD -->
       <section class="card tabpage" id="tabDashboard">
         <h2>Panel</h2>
+
         <div class="kpis">
           <div class="kpi">
             <div class="kpi-label">Entradas (últimos 30 días)</div>
@@ -217,7 +220,7 @@
       <!-- ASIGNACIONES -->
       <section class="card tabpage" id="tabAssignments" hidden>
         <h2>Asignación a trabajador</h2>
-        <p class="muted">Asigna un ítem a un trabajador. Descuenta stock disponible.</p>
+        <p class="muted">Asigna un ítem a un trabajador registrado. Descuenta stock disponible.</p>
 
         <div class="panel">
           <h3>Nueva asignación</h3>
@@ -234,8 +237,10 @@
 
             <div>
               <label for="asWorker">Trabajador</label>
-              <input id="asWorker" type="text" placeholder="Ej: Cabo Alonso Parraguez" />
+              <select id="asWorker"></select>
+              <div class="muted small">Se carga desde Firestore → employees</div>
             </div>
+
             <div>
               <label for="asQty">Cantidad asignada</label>
               <input id="asQty" type="number" min="1" step="1" placeholder="Ej: 2" />
@@ -367,6 +372,7 @@
             <div>
               <label for="rqType">Tipo</label>
               <select id="rqType">
+                <option value="Solicitud">Solicitud</option>
                 <option value="Consulta">Consulta</option>
                 <option value="Reporte">Reporte</option>
                 <option value="Corrección">Corrección</option>
@@ -431,22 +437,16 @@
       <!-- INFORMES -->
       <section class="card tabpage" id="tabReports" hidden>
         <h2>Informes</h2>
-        <p class="muted">Genera reportes por trabajador o por tipo, con exportación CSV.</p>
+        <p class="muted">Reportes por trabajador y resumen global (Entradas, Asignaciones, Mermas, Stock restante).</p>
 
         <div class="panel">
           <h3>Parámetros</h3>
 
           <div class="grid2">
             <div>
-              <label for="rpMode">Modo</label>
-              <select id="rpMode">
-                <option value="worker">Por trabajador (asignaciones)</option>
-                <option value="type">Por tipo (entradas/asignaciones)</option>
-              </select>
-            </div>
-            <div>
-              <label for="rpWorker">Trabajador (opcional)</label>
-              <input id="rpWorker" type="text" placeholder="Si modo trabajador, escribe nombre..." />
+              <label for="rpWorker">Trabajador</label>
+              <select id="rpWorker"></select>
+              <div class="muted small">Se carga desde Firestore → employees</div>
             </div>
 
             <div>
@@ -456,6 +456,14 @@
             <div>
               <label for="rpTo">Hasta (opcional)</label>
               <input id="rpTo" type="date" />
+            </div>
+
+            <div>
+              <label for="rpMode">Vista</label>
+              <select id="rpMode">
+                <option value="worker">Por trabajador (detalle + resumen)</option>
+                <option value="global">Resumen global (stock)</option>
+              </select>
             </div>
           </div>
 
@@ -468,12 +476,34 @@
         </div>
 
         <div class="panel">
+          <h3>Resumen</h3>
+          <div class="kpis kpis-4">
+            <div class="kpi">
+              <div class="kpi-label">Total entradas</div>
+              <div class="kpi-value" id="rpKpiIn">—</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Total asignaciones</div>
+              <div class="kpi-value" id="rpKpiAs">—</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Total mermas</div>
+              <div class="kpi-value" id="rpKpiSc">—</div>
+            </div>
+            <div class="kpi">
+              <div class="kpi-label">Stock restante total</div>
+              <div class="kpi-value" id="rpKpiRemain">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
           <h3>Resultados</h3>
           <div class="table-wrap">
             <table class="table" id="tblReport">
               <thead>
                 <tr>
-                  <th>Clave</th>
+                  <th>Concepto</th>
                   <th class="right">Cantidad</th>
                 </tr>
               </thead>
@@ -483,20 +513,90 @@
         </div>
       </section>
 
+      <!-- EMPLEADOS (solo admin) -->
+      <section class="card tabpage" id="tabEmployees" hidden>
+        <h2>Gestión de empleados (Admin)</h2>
+        <p class="muted">Crea usuarios para el sistema y asigna roles de acceso (admin / operator / consulta).</p>
+
+        <div class="panel">
+          <h3>Crear nuevo empleado</h3>
+
+          <div class="grid2">
+            <div>
+              <label for="empFirst">Nombre</label>
+              <input id="empFirst" type="text" placeholder="Ej: Maritza" />
+            </div>
+            <div>
+              <label for="empLast">Apellidos</label>
+              <input id="empLast" type="text" placeholder="Ej: Aguila" />
+            </div>
+
+            <div>
+              <label for="empEmail">Correo</label>
+              <input id="empEmail" type="email" placeholder="empleado@correo.com" />
+            </div>
+            <div>
+              <label for="empPass">Clave</label>
+              <input id="empPass" type="password" placeholder="Mínimo 6 caracteres" />
+            </div>
+
+            <div>
+              <label for="empRole">Rol</label>
+              <select id="empRole">
+                <option value="consulta">consulta</option>
+                <option value="operator">operator</option>
+                <option value="admin">admin</option>
+              </select>
+            </div>
+
+            <div class="span2">
+              <div class="row">
+                <button class="btn btn--primary" id="btnCreateEmployee" type="button">Crear empleado</button>
+                <span class="muted small">Se crea en Authentication + Firestore (users y employees)</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg" id="empMsg"></div>
+        </div>
+
+        <div class="panel">
+          <h3>Listado de empleados</h3>
+
+          <div class="row row--wrap">
+            <button class="btn btn--ghost" id="btnReloadEmployees" type="button">Actualizar</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="table" id="tblEmployees">
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Correo</th>
+                  <th>Rol</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <div class="msg" id="empListMsg"></div>
+        </div>
+      </section>
+
       <footer class="foot">
         <div class="muted small">
-          MVP académico • APA • Depto. Personal • Firebase Auth + Firestore • Roles: admin/operator/consulta
+          MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
         </div>
       </footer>
     </section>
   </main>
 
   <noscript>
-    <div class="noscript">
-      Esta aplicación requiere JavaScript para funcionar.
-    </div>
+    <div class="noscript">Esta aplicación requiere JavaScript para funcionar.</div>
   </noscript>
 
   <script type="module" src="./app.js"></script>
 </body>
 </html>
+
