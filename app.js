@@ -405,7 +405,14 @@ async function refreshDashboard() {
   const entries30 = entriesCache.filter((e) => safeNum(e.dateTS) >= since).length;
   const assigns30 = assignmentsCache.filter((a) => safeNum(a.dateTS) >= since).length;
   const scrap30 = scrapCache.filter((s) => safeNum(s.dateTS) >= since).length;
-  const pending = requestsCache.filter((r) => (r.status || "Pendiente") === "Pendiente").length;
+  const pending = requestsCache
+    .filter((r) => {
+      if (!canWrite()) {
+        return (r.createdBy || "") === (currentUser && currentUser.uid ? currentUser.uid : "");
+      }
+      return true;
+    })
+    .filter((r) => (r.status || "Pendiente") === "Pendiente").length;
 
   if ($("kpiEntries")) $("kpiEntries").textContent = String(entries30);
   if ($("kpiAssignments")) $("kpiAssignments").textContent = String(assigns30);
@@ -838,6 +845,7 @@ on("formRequest", "submit", async (e) => {
       response: "",
       createdBy: currentUser.uid,
       createdByName: currentUserProfile.name || currentUser.email || "Usuario",
+      createdByEmail: currentUser.email || "",
       createdAt: serverTimestamp()
     });
 
@@ -870,17 +878,24 @@ async function refreshRequests() {
   const textFilter = ($("filterReqText") ? $("filterReqText").value : "").trim().toLowerCase();
 
   const rows = requestsCache.filter((r) => {
+    // Visibilidad por rol:
+    // - consulta: solo ve sus propias solicitudes
+    // - operator/admin: ve todas
+    if (!canWrite()) {
+      if ((r.createdBy || "") !== (currentUser && currentUser.uid ? currentUser.uid : "")) return false;
+    }
+
     const status = r.status || "Pendiente";
     if (statusFilter && status !== statusFilter) return false;
 
-    const hay = ((r.type || "") + " " + (r.text || "")).toLowerCase();
+    const hay = ((r.type || "") + " " + (r.createdByName || "") + " " + (r.createdByEmail || "") + " " + (r.text || "")).toLowerCase();
     if (textFilter && !hay.includes(textFilter)) return false;
 
     return true;
   });
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="muted">Sin resultados</td></tr>';
     return;
   }
 
@@ -892,6 +907,7 @@ async function refreshRequests() {
     tr.innerHTML =
       "<td>" + escapeHtml(formatTimestamp(r.createdAt) || "") + "</td>" +
       "<td>" + escapeHtml(r.type || "") + "</td>" +
+      "<td>" + escapeHtml(r.createdByName || r.createdByEmail || r.createdBy || "") + "</td>" +
       "<td>" + escapeHtml(r.text || "") + "</td>" +
       "<td>" + escapeHtml(r.priority || "") + "</td>" +
       "<td>" + escapeHtml(r.status || "") + "</td>" +
@@ -1480,3 +1496,4 @@ on("reportMode", "change", () => {
   // Asegurar que reqType tenga "Solicitud"
   ensureRequestTypeHasSolicitud();
 })();
+
