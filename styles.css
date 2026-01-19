@@ -252,4 +252,122 @@ input::placeholder{color: rgba(231,239,255,.45)}
 /* Asegura que no haya espacios raros */
 html, body { height:100%; margin:0; }
 
+/* =========================
+   FIX UI: tablas + footer + filtros
+   (pegar al FINAL del styles.css)
+========================= */
+
+/* Espaciado general del contenido */
+.app-page .card {
+  padding: 18px 18px 22px;
+}
+
+.footer {
+  margin-top: 18px;
+  padding: 10px 6px 18px;
+  text-align: center;
+  opacity: 0.9;
+}
+
+/* Barra de filtros/buscador más limpia */
+.filters {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0 14px;
+}
+.filters input,
+.filters select {
+  min-width: 200px;
+}
+
+/* Mensajes (verde/rojo) que no aplasten el layout */
+.msg {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  line-height: 1.25;
+}
+
+/* ===== TABLAS: que no se “junten” los títulos ===== */
+
+/* Contenedor con scroll horizontal para tablas */
+.tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+
+/* IMPORTANTE: envuelve la tabla con scroll sin romper el card */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 14px;
+}
+
+/* Si no tienes wrapper, igual protegemos */
+.tbl {
+  display: block;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* Encabezados */
+.tbl thead th {
+  padding: 12px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: .2px;
+  text-transform: none;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(255,255,255,.10);
+}
+
+/* Celdas */
+.tbl tbody td {
+  padding: 12px 12px;
+  font-size: 13px;
+  white-space: nowrap;         /* evita que “Fecha Tipo…” se pegue */
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+/* Hover suave */
+.tbl tbody tr:hover td {
+  background: rgba(255,255,255,.03);
+}
+
+/* Alineación numérica */
+.tbl .right,
+.tbl td.right,
+.tbl th.right {
+  text-align: right;
+}
+
+/* Para textos largos: permite cortar con puntos suspensivos si querés */
+.tbl td {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* En pantallas pequeñas, reduce un poquito */
+@media (max-width: 720px) {
+  .tbl thead th,
+  .tbl tbody td {
+    padding: 10px 10px;
+    font-size: 12.5px;
+  }
+
+  .filters input,
+  .filters select {
+    min-width: 150px;
+    flex: 1;
+  }
+}
+
+
 
