@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>APA • Sistema</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="badge">APA</div>
+      <div>
+        <div class="brand-title">Sistema de Registros</div>
+        <div class="brand-sub">Depto. Personal • Entradas • Asignaciones • Merma • Solicitudes • Informes</div>
+      </div>
+    </div>
+
+    <div class="userbox">
+      <div class="usertext">
+        <div id="userName">Cargando…</div>
+        <div id="userRole" class="muted small">Rol: —</div>
+      </div>
+      <button id="btnLogout" class="btn btn--ghost">Salir</button>
+    </div>
+  </header>
+
+  <main class="container app-page">
+
+    <!-- Tabs -->
+    <nav id="navTabs" class="tabs">
+      <button class="tab active" data-view="view-dashboard">Panel</button>
+      <button class="tab" data-view="view-entries">Entradas</button>
+      <button class="tab" data-view="view-assign">Asignación</button>
+      <button class="tab" data-view="view-scrap">Merma</button>
+      <button class="tab" data-view="view-requests">Solicitudes</button>
+      <button class="tab" data-view="view-reports">Informes</button>
+      <button class="tab" data-view="view-employees" id="tabEmployees">Empleados</button>
+    </nav>
+
+    <!-- Vistas -->
+    <section id="appShell" class="app">
+
+      <!-- DASHBOARD -->
+      <section id="view-dashboard" class="view">
+        <div class="card">
+          <h2>Panel</h2>
+          <div class="kpis">
+            <div class="kpi"><div class="muted small">Entradas (últimos 30 días)</div><div id="kpiEntries" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Asignaciones (últimos 30 días)</div><div id="kpiAssignments" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Mermas (últimos 30 días)</div><div id="kpiScrap" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Solicitudes pendientes</div><div id="kpiPending" class="kpiVal">0</div></div>
+          </div>
+
+          <div class="grid2">
+            <div>
+              <h3>Últimas entradas</h3>
+              <table id="tblLastEntries" class="tbl">
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th class="right">Disp.</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div>
+              <h3>Últimas asignaciones</h3>
+              <table id="tblLastAssignments" class="tbl">
+                <thead><tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="dashMsg" class="msg ok" style="margin-top:14px;">Panel actualizado.</div>
+        </div>
+      </section>
+
+      <!-- ENTRADAS -->
+      <section id="view-entries" class="view" hidden>
+        <div class="card">
+          <h2>Entradas</h2>
+
+          <form id="formEntry" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="entryDate" type="date" /></div>
+              <div>
+                <label>Tipo</label>
+                <select id="entryType">
+                  <option value="">Seleccionar…</option>
+                  <option>EPP</option>
+                  <option>Uniforme</option>
+                  <option>Documentación</option>
+                  <option>Insumo</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div><label>Cantidad</label><input id="entryQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div><label>Descripción</label><input id="entryDesc" type="text" /></div>
+              <div><label>Referencia / N° Doc</label><input id="entryRef" type="text" /></div>
+            </div>
+
+            <button class="btn" type="submit">Guardar entrada</button>
+            <button class="btn btn--ghost" type="button" id="btnReloadEntries">Actualizar</button>
+          </form>
+
+          <div id="entryMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <select id="filterEntryType">
+              <option value="">Todos los tipos</option>
+              <option>EPP</option><option>Uniforme</option><option>Documentación</option><option>Insumo</option><option>Otro</option>
+            </select>
+            <input id="filterEntryText" type="text" placeholder="Buscar texto…" />
+          </div>
+
+          <table id="tblEntries" class="tbl">
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th class="right">Cant.</th><th class="right">Disp.</th><th>Registrado por</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ASIGNACION -->
+      <section id="view-assign" class="view" hidden>
+        <div class="card">
+          <h2>Asignación</h2>
+
+          <form id="formAssign" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="assignDate" type="date" /></div>
+              <div>
+                <label>Trabajador (desde BD)</label>
+                <select id="assignWorkerSelect"></select>
+                <div class="muted small">Si no aparece, escribe manual:</div>
+                <input id="assignWorker" type="text" placeholder="Nombre trabajador (manual)" />
+              </div>
+              <div><label>Cantidad</label><input id="assignQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label>Ítem (entrada)</label>
+                <select id="assignEntryId"></select>
+              </div>
+              <div><label>Motivo</label><input id="assignReason" type="text" placeholder="Ej: Entrega EPP" /></div>
+            </div>
+
+            <button class="btn" type="submit">Guardar asignación</button>
+            <button class="btn btn--ghost" type="button" id="btnReloadAssignments">Actualizar</button>
+          </form>
+
+          <div id="assignMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <input id="filterAssignWorker" type="text" placeholder="Filtrar trabajador…" />
+            <input id="filterAssignFrom" type="date" />
+            <input id="filterAssignTo" type="date" />
+          </div>
+
+          <table id="tblAssignments" class="tbl">
+            <thead>
+              <tr><th>Fecha</th><th>Trabajador</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Registrado por</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- MERMA -->
+      <section id="view-scrap" class="view" hidden>
+        <div class="card">
+          <h2>Merma</h2>
+
+          <form id="formScrap" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="scrapDate" type="date" /></div>
+              <div>
+                <label>Ítem (entrada)</label>
+                <select id="scrapEntryId"></select>
+              </div>
+              <div><label>Cantidad</label><input id="scrapQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label>Motivo</label>
+                <select id="scrapReason">
+                  <option value="">Seleccionar…</option>
+                  <option>Vencimiento</option>
+                  <option>Daño</option>
+                  <option>Pérdida</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div><label>Detalle (si “Otro”)</label><input id="scrapDetail" type="text" /></div>
+            </div>
+
+            <button class="btn" type="submit">Registrar merma</button>
+          </form>
+
+          <div id="scrapMsg" class="msg info">—</div>
+
+          <table id="tblScrap" class="tbl">
+            <thead>
+              <tr><th>Fecha</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SOLICITUDES -->
+      <section id="view-requests" class="view" hidden>
+        <div class="card">
+          <h2>Solicitudes</h2>
+
+          <form id="formRequest" class="form">
+            <div class="grid3">
+              <div>
+                <label>Tipo</label>
+                <select id="reqType">
+                  <option value="">Seleccionar…</option>
+                  <option>Incidente</option>
+                  <option>Requerimiento</option>
+                  <option>Solicitud</option>
+                </select>
+              </div>
+              <div>
+                <label>Prioridad</label>
+                <select id="reqPriority">
+                  <option>Normal</option>
+                  <option>Alta</option>
+                </select>
+              </div>
+              <div>
+                <label>Detalle</label>
+                <input id="reqText" type="text" placeholder="Describe la solicitud…" />
+              </div>
+            </div>
+
+            <button class="btn" type="submit">Crear</button>
+            <button class="btn btn--ghost" type="button" id="btnReloadRequests">Actualizar</button>
+          </form>
+
+          <div id="reqMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <select id="filterReqStatus">
+              <option value="">Todos</option>
+              <option>Pendiente</option>
+              <option>Respondida</option>
+            </select>
+            <input id="filterReqText" type="text" placeholder="Buscar…" />
+          </div>
+
+          <table id="tblRequests" class="tbl">
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Prioridad</th><th>Estado</th><th>Respuesta</th><th>Acción</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- INFORMES -->
+      <section id="view-reports" class="view" hidden>
+        <div class="card">
+          <h2>Informes</h2>
+
+          <div class="grid3">
+            <div>
+              <label>Modo</label>
+              <select id="reportMode">
+                <option value="worker">Por trabajador</option>
+                <option value="type">Por tipo de entrada</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Trabajador (desde BD)</label>
+              <select id="reportWorkerSelect"></select>
+              <div class="muted small">o filtro texto:</div>
+              <input id="reportFilter" type="text" placeholder="Ej: Maritza / EPP" />
+            </div>
+
+            <div>
+              <label>Rango fechas</label>
+              <div class="row">
+                <input id="reportFrom" type="date" />
+                <input id="reportTo" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <button id="btnRunReport" class="btn">Generar</button>
+            <button id="btnExportCSV" class="btn btn--ghost" disabled>Exportar CSV</button>
+          </div>
+
+          <div class="kpis">
+            <div class="kpi"><div class="muted small">Registros</div><div id="reportCount" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Total cantidades</div><div id="reportQty" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Total merma</div><div id="reportScrapTotal" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Stock total restante</div><div id="reportRemainingTotal" class="kpiVal">0</div></div>
+          </div>
+
+          <div id="reportMsg" class="msg info">—</div>
+
+          <table id="tblReport" class="tbl">
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>EntryId</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- EMPLEADOS (ADMIN) -->
+      <section id="view-employees" class="view" hidden>
+        <div class="card">
+          <h2>Empleados (Admin)</h2>
+
+          <div class="grid2">
+            <div class="card inner">
+              <h3>Crear empleado</h3>
+
+              <div class="grid2">
+                <div><label>Nombres</label><input id="empFirst" type="text" /></div>
+                <div><label>Apellidos</label><input id="empLast" type="text" /></div>
+              </div>
+
+              <div class="grid2">
+                <div><label>Correo</label><input id="empEmail" type="email" /></div>
+                <div>
+                  <label>Clave</label>
+                  <div class="password-wrap">
+                    <input id="empPass" type="password" />
+                    <button id="btnToggleEmpPass" class="btn btn--ghost btn-eye" type="button">👁️</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid2">
+                <div>
+                  <label>Rol</label>
+                  <select id="empRole">
+                    <option value="admin">admin</option>
+                    <option value="operator">operator</option>
+                    <option value="consulta">consulta</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Activo</label>
+                  <select id="empActive">
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row">
+                <button id="btnCreateEmployee" class="btn">Crear</button>
+                <button id="btnReloadEmployees" class="btn btn--ghost" type="button">Actualizar</button>
+              </div>
+
+              <div id="empMsg" class="msg info">—</div>
+            </div>
+
+            <div class="card inner">
+              <h3>Lista empleados</h3>
+              <table id="tblEmployees" class="tbl">
+                <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer muted small">
+        MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
+      </footer>
+
+    </section>
+  </main>
+
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
