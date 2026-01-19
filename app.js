@@ -1,10 +1,12 @@
-import { auth, db } from "./firebase.js";
+import { auth, db, secondaryAuth } from "./firebase.js";
 import { $, setMsg, todayISO, safeNum, escapeHtml, downloadCSV } from "./utils.js";
 
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut
+  signOut,
+  createUserWithEmailAndPassword,
+  updateProfile
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 
 import {
@@ -18,6 +20,7 @@ import {
   orderBy,
   limit,
   updateDoc,
+  setDoc,
   serverTimestamp,
   runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
@@ -26,27 +29,42 @@ import {
   Estado global
 ------------------------- */
 let currentUser = null;
-let currentProfile = null; // {name, role}
-let lastReportRows = null; // para export CSV
-let entryCache = new Map(); // id -> entry doc data
+let currentProfile = null; // users/{uid}: {first,last,name,role,email,active}
+let lastReportRows = null;
+
+let entryCache = new Map();      // entries
+let assignmentsCache = [];       // assignments
+let scrapCache = [];             // scrap
+let requestsCache = [];          // requests
+let employeesCache = [];         // employees
 
 /* -------------------------
   Helpers de rol
 ------------------------- */
-function role() {
-  return currentProfile?.role || "consulta";
+function role(){ return currentProfile?.role || "consulta"; }
+function canWrite(){ return role() === "admin" || role() === "operator"; }
+function isAdmin(){ return role() === "admin"; }
+
+/* -------------------------
+  UI base: mostrar/ocultar
+------------------------- */
+function showLoginOnly(){
+  // Solo login visible
+  $("loginWrap").hidden = false;
+  $("appShell").hidden = true;
+  $("userBox").hidden = true;
 }
-function canWrite() {
-  return role() === "admin" || role() === "operator";
-}
-function isAdmin() {
-  return role() === "admin";
+function showAppOnly(){
+  // Solo app visible
+  $("loginWrap").hidden = true;
+  $("appShell").hidden = false;
+  $("userBox").hidden = false;
 }
 
 /* -------------------------
-  UI: Tabs
+  Tabs
 ------------------------- */
-function setupTabs() {
+function setupTabs(){
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach(btn => {
     btn.addEventListener("click", () => {
@@ -57,36 +75,46 @@ function setupTabs() {
       document.querySelectorAll(".tabpage").forEach(p => p.hidden = true);
       $(target).hidden = false;
 
-      // refrescos según tab
+      if (target === "tabDashboard") loadDashboard();
       if (target === "tabEntries") loadEntries(true);
-      if (target === "tabAssignments") { fillEntryDropdowns(); loadAssignments(true); }
+      if (target === "tabAssignments") { fillEntryDropdowns(); fillEmployeeDropdowns(); loadAssignments(true); }
       if (target === "tabScrap") { fillEntryDropdowns(); loadScrap(true); }
       if (target === "tabRequests") loadRequests(true);
-      if (target === "tabDashboard") loadDashboard();
+      if (target === "tabReports") { fillEmployeeDropdowns(); }
+      if (target === "tabEmployees") { if (isAdmin()) loadEmployees(true); }
     });
   });
 }
 
 /* -------------------------
-  UI: Toggle password
+  Toggle password
 ------------------------- */
-function setupTogglePassword() {
+function setupTogglePassword(){
   const btn = $("btnTogglePassword");
-  if (!btn) return;
+  if (btn){
+    btn.addEventListener("click", () => {
+      const input = $("loginPassword");
+      const isPassword = input.type === "password";
+      input.type = isPassword ? "text" : "password";
+      btn.textContent = isPassword ? "🙈" : "👁️";
+    });
+  }
 
-  btn.addEventListener("click", () => {
-    const input = $("loginPassword");
-    if (!input) return;
-    const isPassword = input.type === "password";
-    input.type = isPassword ? "text" : "password";
-    btn.textContent = isPassword ? "🙈" : "👁️";
-  });
+  const btn2 = $("btnToggleEmpPass");
+  if (btn2){
+    btn2.addEventListener("click", () => {
+      const input = $("empPass");
+      const isPassword = input.type === "password";
+      input.type = isPassword ? "text" : "password";
+      btn2.textContent = isPassword ? "🙈" : "👁️";
+    });
+  }
 }
 
 /* -------------------------
-  Login / Logout
+  Auth
 ------------------------- */
-function setupAuthButtons() {
+function setupAuthButtons(){
   $("btnLogin").addEventListener("click", async () => {
     const email = $("loginEmail").value.trim();
     const password = $("loginPassword").value;
@@ -94,7 +122,7 @@ function setupAuthButtons() {
     const btn = $("btnLogin");
 
     setMsg(msg, "");
-    if (!email || !password) {
+    if (!email || !password){
       setMsg(msg, "Debes ingresar correo y contraseña.", "warn");
       return;
     }
@@ -102,24 +130,24 @@ function setupAuthButtons() {
     btn.disabled = true;
     setMsg(msg, "Verificando credenciales...", "info");
 
-    try {
+    try{
       await signInWithEmailAndPassword(auth, email, password);
       setMsg(msg, "✅ Ingreso exitoso. Cargando sistema...", "ok");
-    } catch (err) {
+    }catch(err){
       const code = err?.code || "";
-      if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
+      if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")){
         setMsg(msg, "❌ Correo o contraseña incorrectos.", "bad");
-      } else if (code.includes("auth/user-not-found")) {
+      } else if (code.includes("auth/user-not-found")){
         setMsg(msg, "❌ No existe un usuario con ese correo en Firebase Auth.", "bad");
-      } else if (code.includes("auth/too-many-requests")) {
+      } else if (code.includes("auth/too-many-requests")){
         setMsg(msg, "⚠️ Demasiados intentos. Espera un momento y prueba de nuevo.", "warn");
-      } else if (code.includes("auth/unauthorized-domain")) {
+      } else if (code.includes("auth/unauthorized-domain")){
         setMsg(msg, "❌ Dominio no autorizado en Firebase Auth (Authorized domains).", "bad");
       } else {
         setMsg(msg, `❌ Error de autenticación (${code || "desconocido"}).`, "bad");
       }
       console.error(err);
-    } finally {
+    }finally{
       btn.disabled = false;
     }
   });
@@ -129,37 +157,19 @@ function setupAuthButtons() {
   });
 }
 
-/* -------------------------
-  Carga de perfil desde Firestore
-------------------------- */
-async function loadProfile(uid) {
+async function loadProfile(uid){
   const ref = doc(db, "users", uid);
   const snap = await getDoc(ref);
   if (!snap.exists()) return null;
   return snap.data();
 }
 
-/* -------------------------
-  Arranque y AuthState
-------------------------- */
-function showLogin() {
-  $("loginCard").hidden = false;
-  $("appShell").hidden = true;
-  $("userBox").hidden = true;
-}
-function showApp() {
-  $("loginCard").hidden = true;
-  $("appShell").hidden = false;
-  $("userBox").hidden = false;
-}
-
-async function onUserReady(user) {
+async function onUserReady(user){
   currentUser = user;
   currentProfile = await loadProfile(user.uid);
 
-  if (!currentProfile?.role) {
-    // Si no hay doc users/{uid}, no puede operar
-    showLogin();
+  if (!currentProfile?.role){
+    showLoginOnly();
     setMsg($("loginMsg"),
       "⚠️ Tu usuario existe, pero falta tu perfil en Firestore: users/{uid} con role (admin/operator/consulta).",
       "warn"
@@ -167,40 +177,210 @@ async function onUserReady(user) {
     return;
   }
 
-  $("userName").textContent = currentProfile.name || user.email || "Usuario";
+  // si está inactivo
+  if (currentProfile.active === false){
+    showLoginOnly();
+    setMsg($("loginMsg"), "❌ Usuario inactivo. Contacta al administrador.", "bad");
+    await signOut(auth);
+    return;
+  }
+
+  $("userName").textContent = currentProfile.name || currentProfile.email || user.email || "Usuario";
   $("userRole").textContent = `Rol: ${currentProfile.role}`;
 
-  // restricciones UI según rol
-  applyRoleUI();
+  // habilitar tab empleados solo admin
+  $("tabEmployeesBtn").hidden = !isAdmin();
 
-  showApp();
+  applyRoleUI();
+  showAppOnly();
+
+  // precargas
   setupTabs();
+  await loadEmployees(false); // para dropdowns
+  await loadEntries(false);
+
   loadDashboard();
-  loadEntries(true); // para caché y dropdown
 }
 
-function applyRoleUI() {
-  // Si no puede escribir, deshabilita botones de guardado
-  const writeButtons = ["btnSaveEntry", "btnSaveAssign", "btnSaveScrap"];
-  writeButtons.forEach(id => {
+function applyRoleUI(){
+  ["btnSaveEntry","btnSaveAssign","btnSaveScrap"].forEach(id => {
     const b = $(id);
     if (!b) return;
     b.disabled = !canWrite();
     b.title = canWrite() ? "" : "No tienes permisos para registrar (solo admin/operator).";
   });
+
+  // Empleados: solo admin
+  if ($("btnCreateEmployee")) $("btnCreateEmployee").disabled = !isAdmin();
+}
+
+/* -------------------------
+  Empleados (admin)
+  Colección: employees/{uid}
+  Perfil/roles: users/{uid}
+------------------------- */
+function setupEmployees(){
+  $("btnCreateEmployee").addEventListener("click", async () => {
+    const msg = $("empMsg");
+    setMsg(msg, "");
+
+    if (!isAdmin()){
+      setMsg(msg, "❌ Solo admin puede crear empleados.", "bad");
+      return;
+    }
+
+    const first = $("empFirst").value.trim();
+    const last = $("empLast").value.trim();
+    const email = $("empEmail").value.trim().toLowerCase();
+    const pass = $("empPass").value;
+    const roleSel = $("empRole").value;
+    const active = $("empActive").value === "true";
+
+    if (!first || !last || !email || pass.length < 6){
+      setMsg(msg, "Completa nombre, apellidos, correo y clave (mínimo 6).", "warn");
+      return;
+    }
+
+    try{
+      setMsg(msg, "Creando usuario en Firebase Auth...", "info");
+
+      // Crear usuario en Auth secundario (no cambia la sesión del admin)
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
+
+      // Set display name en ese usuario (opcional)
+      try{
+        await updateProfile(cred.user, { displayName: `${first} ${last}` });
+      }catch{}
+
+      const uid = cred.user.uid;
+      const fullName = `${first} ${last}`;
+
+      setMsg(msg, "Guardando perfil y empleado en Firestore...", "info");
+
+      // employees/{uid}
+      await setDoc(doc(db, "employees", uid), {
+        uid,
+        first,
+        last,
+        name: fullName,
+        email,
+        role: roleSel,
+        active,
+        createdBy: currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+
+      // users/{uid} -> usado por el sistema para permisos
+      await setDoc(doc(db, "users", uid), {
+        first,
+        last,
+        name: fullName,
+        email,
+        role: roleSel,
+        active
+      });
+
+      // limpiar form
+      $("empFirst").value = "";
+      $("empLast").value = "";
+      $("empEmail").value = "";
+      $("empPass").value = "";
+      $("empRole").value = "consulta";
+      $("empActive").value = "true";
+
+      setMsg(msg, "✅ Empleado creado. Ya puede iniciar sesión con su correo/clave.", "ok");
+
+      await loadEmployees(true);
+      fillEmployeeDropdowns();
+
+    }catch(err){
+      console.error(err);
+      const code = err?.code || "";
+      if (code.includes("auth/email-already-in-use")){
+        setMsg(msg, "❌ Ese correo ya está registrado en Firebase Auth.", "bad");
+      } else {
+        setMsg(msg, `❌ Error al crear empleado (${code || "desconocido"}).`, "bad");
+      }
+    }
+  });
+
+  $("btnReloadEmployees").addEventListener("click", () => loadEmployees(true));
+}
+
+async function loadEmployees(showMsg){
+  const msg = $("empListMsg");
+  if (showMsg && msg) setMsg(msg, "Cargando empleados...", "info");
+
+  employeesCache = [];
+  try{
+    const qy = query(collection(db, "employees"), orderBy("name","asc"), limit(500));
+    const snap = await getDocs(qy);
+    snap.forEach(d => employeesCache.push({ id:d.id, ...d.data() }));
+
+    renderEmployeesTable();
+    fillEmployeeDropdowns();
+
+    if (showMsg && msg) setMsg(msg, `✅ Empleados cargados: ${employeesCache.length}`, "ok");
+  }catch(e){
+    console.error(e);
+    if (showMsg && msg) setMsg(msg, "❌ No se pudieron cargar empleados (¿permisos?).", "bad");
+  }
+}
+
+function renderEmployeesTable(){
+  const tbody = $("tblEmployees")?.querySelector("tbody");
+  if (!tbody) return;
+
+  tbody.innerHTML = employeesCache.map(e => `
+    <tr>
+      <td>${escapeHtml(e.name || `${e.first||""} ${e.last||""}`)}</td>
+      <td>${escapeHtml(e.email || "")}</td>
+      <td>${escapeHtml(e.role || "")}</td>
+      <td>${e.active === false ? "No" : "Sí"}</td>
+    </tr>
+  `).join("") || `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
+}
+
+function fillEmployeeDropdowns(){
+  // dropdown en Asignación
+  const selAs = $("asWorkerSelect");
+  // dropdown en Informes
+  const selRp = $("rpWorkerSelect");
+
+  const options =
+    `<option value="">(Todos / sin filtro)</option>` +
+    employeesCache
+      .filter(e => e.active !== false)
+      .map(e => `<option value="${escapeHtml(e.name || "")}">${escapeHtml(e.name || "")}</option>`)
+      .join("");
+
+  if (selAs){
+    // aquí no queremos "todos", queremos selección obligatoria
+    const optAs =
+      `<option value="">(Selecciona trabajador)</option>` +
+      employeesCache
+        .filter(e => e.active !== false)
+        .map(e => `<option value="${escapeHtml(e.name || "")}">${escapeHtml(e.name || "")}</option>`)
+        .join("");
+    selAs.innerHTML = optAs;
+  }
+
+  if (selRp){
+    selRp.innerHTML = options;
+  }
 }
 
 /* -------------------------
   Entradas
 ------------------------- */
-function setupEntries() {
+function setupEntries(){
   $("entDate").value = todayISO();
 
   $("btnSaveEntry").addEventListener("click", async () => {
     const msg = $("entMsg");
     setMsg(msg, "");
 
-    if (!canWrite()) {
+    if (!canWrite()){
       setMsg(msg, "No tienes permisos para registrar entradas.", "bad");
       return;
     }
@@ -212,12 +392,12 @@ function setupEntries() {
     const qty = safeNum($("entQty").value);
     const docRef = $("entDoc").value.trim();
 
-    if (!desc || qty <= 0) {
+    if (!desc || qty <= 0){
       setMsg(msg, "Completa descripción y cantidad válida.", "warn");
       return;
     }
 
-    try {
+    try{
       setMsg(msg, "Guardando entrada...", "info");
 
       await addDoc(collection(db, "entries"), {
@@ -239,9 +419,8 @@ function setupEntries() {
       $("entDoc").value = "";
 
       await loadEntries(true);
-      fillEntryDropdowns();
       loadDashboard();
-    } catch (e) {
+    }catch(e){
       console.error(e);
       setMsg(msg, "❌ Error al guardar entrada (revisa reglas/rol).", "bad");
     }
@@ -252,28 +431,28 @@ function setupEntries() {
   $("entFilterType").addEventListener("change", () => renderEntriesTable());
 }
 
-async function loadEntries(showMsg) {
+async function loadEntries(showMsg){
   const msg = $("entListMsg");
   if (showMsg) setMsg(msg, "Cargando entradas...", "info");
 
   entryCache.clear();
 
-  try {
-    const q = query(collection(db, "entries"), orderBy("date", "desc"), limit(200));
-    const snap = await getDocs(q);
-    snap.forEach(d => entryCache.set(d.id, { id: d.id, ...d.data() }));
+  try{
+    const qy = query(collection(db, "entries"), orderBy("date","desc"), limit(500));
+    const snap = await getDocs(qy);
+    snap.forEach(d => entryCache.set(d.id, { id:d.id, ...d.data() }));
 
     renderEntriesTable();
     fillEntryDropdowns();
 
     if (showMsg) setMsg(msg, `✅ Entradas cargadas: ${entryCache.size}`, "ok");
-  } catch (e) {
+  }catch(e){
     console.error(e);
-    if (showMsg) setMsg(msg, "❌ No se pudieron cargar entradas (¿login/permiso?).", "bad");
+    if (showMsg) setMsg(msg, "❌ No se pudieron cargar entradas.", "bad");
   }
 }
 
-function renderEntriesTable() {
+function renderEntriesTable(){
   const tbody = $("tblEntries").querySelector("tbody");
   const search = ($("entSearch").value || "").toLowerCase();
   const fType = $("entFilterType").value;
@@ -298,7 +477,7 @@ function renderEntriesTable() {
   `).join("") || `<tr><td colspan="7" class="muted">Sin datos</td></tr>`;
 }
 
-function fillEntryDropdowns() {
+function fillEntryDropdowns(){
   const opts = Array.from(entryCache.values())
     .sort((a,b) => (b.date || "").localeCompare(a.date || ""))
     .map(r => {
@@ -306,39 +485,37 @@ function fillEntryDropdowns() {
       return `<option value="${r.id}">${escapeHtml(label)}</option>`;
     }).join("");
 
-  const selA = $("asEntry");
-  const selS = $("scEntry");
-  if (selA) selA.innerHTML = opts || `<option value="">(Sin entradas)</option>`;
-  if (selS) selS.innerHTML = opts || `<option value="">(Sin entradas)</option>`;
+  $("asEntry").innerHTML = opts || `<option value="">(Sin entradas)</option>`;
+  $("scEntry").innerHTML = opts || `<option value="">(Sin entradas)</option>`;
 }
 
 /* -------------------------
   Asignaciones
 ------------------------- */
-function setupAssignments() {
+function setupAssignments(){
   $("asDate").value = todayISO();
 
   $("btnSaveAssign").addEventListener("click", async () => {
     const msg = $("asMsg");
     setMsg(msg, "");
 
-    if (!canWrite()) {
+    if (!canWrite()){
       setMsg(msg, "No tienes permisos para registrar asignaciones.", "bad");
       return;
     }
 
     const entryId = $("asEntry").value;
     const date = $("asDate").value || todayISO();
-    const worker = $("asWorker").value.trim();
+    const worker = $("asWorkerSelect").value; // ahora desde base
     const qty = safeNum($("asQty").value);
     const reason = $("asReason").value.trim();
 
-    if (!entryId || !worker || qty <= 0) {
+    if (!entryId || !worker || qty <= 0){
       setMsg(msg, "Completa entrada, trabajador y cantidad válida.", "warn");
       return;
     }
 
-    try {
+    try{
       setMsg(msg, "Guardando asignación...", "info");
 
       await runTransaction(db, async (tx) => {
@@ -350,7 +527,6 @@ function setupAssignments() {
 
         if (qty > available) throw new Error("Cantidad excede disponible");
 
-        // crear asignación
         const aRef = doc(collection(db, "assignments"));
         tx.set(aRef, {
           entryId,
@@ -364,25 +540,22 @@ function setupAssignments() {
           createdAt: serverTimestamp()
         });
 
-        // actualizar disponible
         tx.update(eRef, { available: available - qty });
       });
 
       setMsg(msg, "✅ Asignación registrada y stock actualizado.", "ok");
-      $("asWorker").value = "";
       $("asQty").value = "";
       $("asReason").value = "";
 
       await loadEntries(false);
       await loadAssignments(true);
-      fillEntryDropdowns();
       loadDashboard();
-    } catch (e) {
+    }catch(e){
       console.error(e);
-      if (String(e.message).includes("excede")) {
+      if (String(e.message).includes("excede")){
         setMsg(msg, "❌ La cantidad asignada supera el stock disponible.", "bad");
-      } else {
-        setMsg(msg, "❌ Error al guardar asignación (reglas/rol/entrada).", "bad");
+      }else{
+        setMsg(msg, "❌ Error al guardar asignación.", "bad");
       }
     }
   });
@@ -391,26 +564,25 @@ function setupAssignments() {
   $("asSearch").addEventListener("input", () => renderAssignmentsTable());
 }
 
-let assignmentsCache = [];
-async function loadAssignments(showMsg) {
+async function loadAssignments(showMsg){
   const msg = $("asListMsg");
   if (showMsg) setMsg(msg, "Cargando asignaciones...", "info");
 
   assignmentsCache = [];
-  try {
-    const q = query(collection(db, "assignments"), orderBy("date", "desc"), limit(200));
-    const snap = await getDocs(q);
-    snap.forEach(d => assignmentsCache.push({ id: d.id, ...d.data() }));
+  try{
+    const qy = query(collection(db, "assignments"), orderBy("date","desc"), limit(500));
+    const snap = await getDocs(qy);
+    snap.forEach(d => assignmentsCache.push({ id:d.id, ...d.data() }));
 
     renderAssignmentsTable();
     if (showMsg) setMsg(msg, `✅ Asignaciones cargadas: ${assignmentsCache.length}`, "ok");
-  } catch (e) {
+  }catch(e){
     console.error(e);
     if (showMsg) setMsg(msg, "❌ No se pudieron cargar asignaciones.", "bad");
   }
 }
 
-function renderAssignmentsTable() {
+function renderAssignmentsTable(){
   const tbody = $("tblAssignments").querySelector("tbody");
   const s = ($("asSearch").value || "").toLowerCase();
 
@@ -433,14 +605,14 @@ function renderAssignmentsTable() {
 /* -------------------------
   Merma
 ------------------------- */
-function setupScrap() {
+function setupScrap(){
   $("scDate").value = todayISO();
 
   $("btnSaveScrap").addEventListener("click", async () => {
     const msg = $("scMsg");
     setMsg(msg, "");
 
-    if (!canWrite()) {
+    if (!canWrite()){
       setMsg(msg, "No tienes permisos para registrar merma.", "bad");
       return;
     }
@@ -451,16 +623,16 @@ function setupScrap() {
     const reason = $("scReason").value;
     const detail = $("scDetail").value.trim();
 
-    if (!entryId || qty <= 0) {
+    if (!entryId || qty <= 0){
       setMsg(msg, "Completa entrada y cantidad válida.", "warn");
       return;
     }
-    if (reason === "Otro" && !detail) {
+    if (reason === "Otro" && !detail){
       setMsg(msg, "Si motivo es 'Otro', el detalle es obligatorio.", "warn");
       return;
     }
 
-    try {
+    try{
       setMsg(msg, "Guardando merma...", "info");
 
       await runTransaction(db, async (tx) => {
@@ -494,14 +666,13 @@ function setupScrap() {
 
       await loadEntries(false);
       await loadScrap(true);
-      fillEntryDropdowns();
       loadDashboard();
-    } catch (e) {
+    }catch(e){
       console.error(e);
-      if (String(e.message).includes("excede")) {
+      if (String(e.message).includes("excede")){
         setMsg(msg, "❌ La cantidad de merma supera el stock disponible.", "bad");
-      } else {
-        setMsg(msg, "❌ Error al guardar merma (reglas/rol/entrada).", "bad");
+      }else{
+        setMsg(msg, "❌ Error al guardar merma.", "bad");
       }
     }
   });
@@ -510,26 +681,25 @@ function setupScrap() {
   $("scSearch").addEventListener("input", () => renderScrapTable());
 }
 
-let scrapCache = [];
-async function loadScrap(showMsg) {
+async function loadScrap(showMsg){
   const msg = $("scListMsg");
   if (showMsg) setMsg(msg, "Cargando mermas...", "info");
 
   scrapCache = [];
-  try {
-    const q = query(collection(db, "scrap"), orderBy("date", "desc"), limit(200));
-    const snap = await getDocs(q);
-    snap.forEach(d => scrapCache.push({ id: d.id, ...d.data() }));
+  try{
+    const qy = query(collection(db, "scrap"), orderBy("date","desc"), limit(500));
+    const snap = await getDocs(qy);
+    snap.forEach(d => scrapCache.push({ id:d.id, ...d.data() }));
 
     renderScrapTable();
     if (showMsg) setMsg(msg, `✅ Mermas cargadas: ${scrapCache.length}`, "ok");
-  } catch (e) {
+  }catch(e){
     console.error(e);
     if (showMsg) setMsg(msg, "❌ No se pudieron cargar mermas.", "bad");
   }
 }
 
-function renderScrapTable() {
+function renderScrapTable(){
   const tbody = $("tblScrap").querySelector("tbody");
   const s = ($("scSearch").value || "").toLowerCase();
 
@@ -552,7 +722,7 @@ function renderScrapTable() {
 /* -------------------------
   Solicitudes
 ------------------------- */
-function setupRequests() {
+function setupRequests(){
   $("btnSaveRequest").addEventListener("click", async () => {
     const msg = $("rqMsg");
     setMsg(msg, "");
@@ -561,12 +731,12 @@ function setupRequests() {
     const priority = $("rqPriority").value;
     const detail = $("rqDetail").value.trim();
 
-    if (!detail) {
+    if (!detail){
       setMsg(msg, "El detalle es obligatorio.", "warn");
       return;
     }
 
-    try {
+    try{
       setMsg(msg, "Enviando solicitud...", "info");
 
       await addDoc(collection(db, "requests"), {
@@ -584,7 +754,7 @@ function setupRequests() {
       setMsg(msg, "✅ Solicitud enviada.", "ok");
       await loadRequests(true);
       loadDashboard();
-    } catch (e) {
+    }catch(e){
       console.error(e);
       setMsg(msg, "❌ Error al enviar solicitud.", "bad");
     }
@@ -594,35 +764,33 @@ function setupRequests() {
   $("rqFilterStatus").addEventListener("change", () => renderRequestsTable());
 }
 
-let requestsCache = [];
-async function loadRequests(showMsg) {
+async function loadRequests(showMsg){
   const msg = $("rqListMsg");
   if (showMsg) setMsg(msg, "Cargando solicitudes...", "info");
 
   requestsCache = [];
-  try {
-    const q = query(collection(db, "requests"), orderBy("createdAt", "desc"), limit(200));
-    const snap = await getDocs(q);
-    snap.forEach(d => requestsCache.push({ id: d.id, ...d.data() }));
+  try{
+    const qy = query(collection(db, "requests"), orderBy("createdAt","desc"), limit(500));
+    const snap = await getDocs(qy);
+    snap.forEach(d => requestsCache.push({ id:d.id, ...d.data() }));
 
     renderRequestsTable();
     if (showMsg) setMsg(msg, `✅ Solicitudes cargadas: ${requestsCache.length}`, "ok");
-  } catch (e) {
+  }catch(e){
     console.error(e);
     if (showMsg) setMsg(msg, "❌ No se pudieron cargar solicitudes.", "bad");
   }
 }
 
-function renderRequestsTable() {
+function renderRequestsTable(){
   const tbody = $("tblRequests").querySelector("tbody");
   const f = $("rqFilterStatus").value;
 
   const rows = requestsCache.filter(r => !f || r.status === f);
 
   tbody.innerHTML = rows.map(r => {
-    const canRespond = canWrite();
-    const actionHtml = canRespond
-      ? `<button class="btn btn--primary btnSmall" data-act="respond" data-id="${r.id}">Responder</button>`
+    const actionHtml = canWrite()
+      ? `<button class="btn btn--primary" data-act="respond" data-id="${r.id}">Responder</button>`
       : `<span class="muted small">—</span>`;
 
     return `
@@ -638,15 +806,14 @@ function renderRequestsTable() {
     `;
   }).join("") || `<tr><td colspan="7" class="muted">Sin datos</td></tr>`;
 
-  // bind acciones
   tbody.querySelectorAll("button[data-act='respond']").forEach(b => {
     b.addEventListener("click", () => openRespondPrompt(b.dataset.id));
   });
 }
 
-async function openRespondPrompt(requestId) {
+async function openRespondPrompt(requestId){
   const msg = $("rqListMsg");
-  if (!canWrite()) {
+  if (!canWrite()){
     setMsg(msg, "No tienes permisos para responder.", "bad");
     return;
   }
@@ -655,56 +822,58 @@ async function openRespondPrompt(requestId) {
   if (text === null) return;
 
   const response = text.trim();
-  if (!response) {
+  if (!response){
     setMsg(msg, "La respuesta no puede estar vacía.", "warn");
     return;
   }
 
-  try {
+  try{
     setMsg(msg, "Guardando respuesta...", "info");
-    await updateDoc(doc(db, "requests", requestId), {
-      status: "Respondida",
-      response
-    });
+    await updateDoc(doc(db, "requests", requestId), { status:"Respondida", response });
     setMsg(msg, "✅ Solicitud respondida.", "ok");
     await loadRequests(false);
     loadDashboard();
-  } catch (e) {
+  }catch(e){
     console.error(e);
     setMsg(msg, "❌ Error al responder solicitud.", "bad");
   }
 }
 
 /* -------------------------
-  Informes
+  Informes (mejorado)
+  - Selección trabajador desde employees
+  - Incluye mermas
+  - Incluye resumen stock total restante
 ------------------------- */
-function setupReports() {
+function setupReports(){
   $("btnRunReport").addEventListener("click", async () => {
     const msg = $("rpMsg");
+    const msg2 = $("rpSummaryMsg");
     setMsg(msg, "Generando informe...", "info");
+    setMsg(msg2, "");
     $("btnExportCSV").disabled = true;
     lastReportRows = null;
 
-    try {
+    try{
       const mode = $("rpMode").value;
-      const worker = $("rpWorker").value.trim();
+      const worker = $("rpWorkerSelect").value; // ahora desde base
       const from = $("rpFrom").value;
       const to = $("rpTo").value;
 
-      // cargamos datasets base
-      // (consulta simple: no usamos queries complejas para no pelear con índices en TAP)
-      const [asSnap, enSnap] = await Promise.all([
-        getDocs(query(collection(db, "assignments"), orderBy("date", "desc"), limit(500))),
-        getDocs(query(collection(db, "entries"), orderBy("date", "desc"), limit(500)))
+      // Cargamos datasets (simple, sin índices extra)
+      const [enSnap, asSnap, scSnap] = await Promise.all([
+        getDocs(query(collection(db, "entries"), orderBy("date","desc"), limit(1000))),
+        getDocs(query(collection(db, "assignments"), orderBy("date","desc"), limit(1000))),
+        getDocs(query(collection(db, "scrap"), orderBy("date","desc"), limit(1000)))
       ]);
 
-      const assignments = [];
-      asSnap.forEach(d => assignments.push({ id: d.id, ...d.data() }));
-
       const entries = [];
-      enSnap.forEach(d => entries.push({ id: d.id, ...d.data() }));
+      enSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
+      const assignments = [];
+      asSnap.forEach(d => assignments.push({ id:d.id, ...d.data() }));
+      const scrap = [];
+      scSnap.forEach(d => scrap.push({ id:d.id, ...d.data() }));
 
-      // filtros por fecha (ISO string)
       const inRange = (d) => {
         if (!d) return true;
         if (from && d < from) return false;
@@ -712,41 +881,77 @@ function setupReports() {
         return true;
       };
 
-      const agg = new Map(); // key -> sum qty
+      // helper: stock total restante (sum available)
+      const totalRemaining = entries.reduce((acc, e) => acc + safeNum(e.available), 0);
+      const totalEntered = entries.reduce((acc, e) => acc + safeNum(e.qty), 0);
+      const totalAssigned = assignments.reduce((acc, a) => acc + safeNum(a.qty), 0);
+      const totalScrap = scrap.reduce((acc, s2) => acc + safeNum(s2.qty), 0);
 
-      if (mode === "worker") {
+      const agg = new Map();
+
+      if (mode === "worker"){
         const filtered = assignments
           .filter(a => inRange(a.date))
-          .filter(a => !worker || (a.worker || "").toLowerCase().includes(worker.toLowerCase()));
+          .filter(a => !worker || a.worker === worker);
 
         filtered.forEach(a => {
           const key = a.worker || "(Sin nombre)";
           agg.set(key, (agg.get(key) || 0) + safeNum(a.qty));
         });
 
-      } else {
-        // mode === type
-        // sumamos entradas y asignaciones por tipo (para mostrar trazabilidad por tipo)
+        setMsg(msg2, `Resumen global (no filtrado): Entradas=${totalEntered} • Asignaciones=${totalAssigned} • Mermas=${totalScrap} • Stock restante=${totalRemaining}`, "info");
+
+      } else if (mode === "type"){
+        // Entradas por tipo
         entries.filter(e => inRange(e.date)).forEach(e => {
           const key = `Entradas • ${e.type || "Otro"}`;
           agg.set(key, (agg.get(key) || 0) + safeNum(e.qty));
         });
+        // Asignaciones por tipo
         assignments.filter(a => inRange(a.date)).forEach(a => {
           const key = `Asignaciones • ${a.entryType || "Otro"}`;
           agg.set(key, (agg.get(key) || 0) + safeNum(a.qty));
         });
+        // Mermas por tipo
+        scrap.filter(s2 => inRange(s2.date)).forEach(s2 => {
+          const key = `Mermas • ${s2.entryType || "Otro"}`;
+          agg.set(key, (agg.get(key) || 0) + safeNum(s2.qty));
+        });
+
+        setMsg(msg2, `Stock total restante (todas las entradas): ${totalRemaining}`, "info");
+
+      } else {
+        // mode === "stock"
+        // Resumen total + por tipo de disponible
+        agg.set("Total Entradas", totalEntered);
+        agg.set("Total Asignaciones", totalAssigned);
+        agg.set("Total Mermas", totalScrap);
+        agg.set("Stock Total Restante", totalRemaining);
+
+        // disponible por tipo (sum available)
+        const byType = new Map();
+        entries.forEach(e => {
+          const t = e.type || "Otro";
+          byType.set(t, (byType.get(t)||0) + safeNum(e.available));
+        });
+        Array.from(byType.entries()).forEach(([t, v]) => {
+          agg.set(`Disponible • ${t}`, v);
+        });
+
+        setMsg(msg2, "Incluye disponible por tipo + totales (entradas/asignaciones/mermas).", "info");
       }
 
       const rows = Array.from(agg.entries())
         .sort((a,b) => b[1] - a[1])
-        .map(([key, qty]) => ({ key, qty }));
+        .map(([concept, qty]) => ({ concept, qty }));
 
       renderReport(rows);
       lastReportRows = rows;
       $("btnExportCSV").disabled = rows.length === 0;
 
       setMsg(msg, `✅ Informe generado (${rows.length} filas).`, "ok");
-    } catch (e) {
+
+    }catch(e){
       console.error(e);
       setMsg(msg, "❌ Error al generar informe (revisa permisos/reglas).", "bad");
     }
@@ -755,32 +960,31 @@ function setupReports() {
   $("btnExportCSV").addEventListener("click", () => {
     if (!lastReportRows) return;
     const rows = [
-      ["Clave", "Cantidad"],
-      ...lastReportRows.map(r => [r.key, r.qty])
+      ["Concepto","Cantidad"],
+      ...lastReportRows.map(r => [r.concept, r.qty])
     ];
     downloadCSV("informe_apa.csv", rows);
   });
 }
 
-function renderReport(rows) {
+function renderReport(rows){
   const tbody = $("tblReport").querySelector("tbody");
   tbody.innerHTML = rows.map(r => `
     <tr>
-      <td>${escapeHtml(r.key)}</td>
+      <td>${escapeHtml(r.concept)}</td>
       <td class="right">${safeNum(r.qty)}</td>
     </tr>
   `).join("") || `<tr><td colspan="2" class="muted">Sin resultados</td></tr>`;
 }
 
 /* -------------------------
-  Dashboard
+  Dashboard (se corrige error visual: no se muestra antes de login)
 ------------------------- */
-async function loadDashboard() {
+async function loadDashboard(){
   const msg = $("dashMsg");
   setMsg(msg, "Cargando panel...", "info");
 
-  try {
-    // Últimos 30 días (ISO)
+  try{
     const now = new Date();
     const d30 = new Date(now.getTime() - 30*24*60*60*1000);
     const from = `${d30.getFullYear()}-${String(d30.getMonth()+1).padStart(2,"0")}-${String(d30.getDate()).padStart(2,"0")}`;
@@ -792,14 +996,10 @@ async function loadDashboard() {
       getDocs(query(collection(db, "requests"), orderBy("createdAt","desc"), limit(300)))
     ]);
 
-    const entries = [];
-    enSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
-    const assignments = [];
-    asSnap.forEach(d => assignments.push({ id:d.id, ...d.data() }));
-    const scrap = [];
-    scSnap.forEach(d => scrap.push({ id:d.id, ...d.data() }));
-    const requests = [];
-    rqSnap.forEach(d => requests.push({ id:d.id, ...d.data() }));
+    const entries = []; enSnap.forEach(d => entries.push({ id:d.id, ...d.data() }));
+    const assignments = []; asSnap.forEach(d => assignments.push({ id:d.id, ...d.data() }));
+    const scrap = []; scSnap.forEach(d => scrap.push({ id:d.id, ...d.data() }));
+    const requests = []; rqSnap.forEach(d => requests.push({ id:d.id, ...d.data() }));
 
     const en30 = entries.filter(x => (x.date || "") >= from).length;
     const as30 = assignments.filter(x => (x.date || "") >= from).length;
@@ -811,10 +1011,9 @@ async function loadDashboard() {
     $("kpiScrap").textContent = String(sc30);
     $("kpiPending").textContent = String(pend);
 
-    // last tables
+    // últimos
     const lastE = entries.slice(0, 6);
-    const tbodyE = $("tblLastEntries").querySelector("tbody");
-    tbodyE.innerHTML = lastE.map(r => `
+    $("tblLastEntries").querySelector("tbody").innerHTML = lastE.map(r => `
       <tr>
         <td>${escapeHtml(r.date || "")}</td>
         <td>${escapeHtml(r.type || "")}</td>
@@ -825,8 +1024,7 @@ async function loadDashboard() {
     `).join("") || `<tr><td colspan="5" class="muted">Sin datos</td></tr>`;
 
     const lastA = assignments.slice(0, 6);
-    const tbodyA = $("tblLastAssignments").querySelector("tbody");
-    tbodyA.innerHTML = lastA.map(r => `
+    $("tblLastAssignments").querySelector("tbody").innerHTML = lastA.map(r => `
       <tr>
         <td>${escapeHtml(r.date || "")}</td>
         <td>${escapeHtml(r.worker || "")}</td>
@@ -836,17 +1034,17 @@ async function loadDashboard() {
     `).join("") || `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
 
     setMsg(msg, "✅ Panel actualizado.", "ok");
-  } catch (e) {
+  }catch(e){
     console.error(e);
     setMsg(msg, "❌ No se pudo cargar el panel (¿permisos?).", "bad");
   }
 }
 
 /* -------------------------
-  Init
+  INIT
 ------------------------- */
-function boot() {
-  // Defaults fechas
+function boot(){
+  // defaults
   if ($("entDate")) $("entDate").value = todayISO();
   if ($("asDate")) $("asDate").value = todayISO();
   if ($("scDate")) $("scDate").value = todayISO();
@@ -854,23 +1052,27 @@ function boot() {
   setupTogglePassword();
   setupAuthButtons();
 
+  setupEmployees();
   setupEntries();
   setupAssignments();
   setupScrap();
   setupRequests();
   setupReports();
 
-  // Si el script muere por cualquier motivo, deja evidencia en loginMsg
   window.addEventListener("error", () => {
     const m = $("loginMsg");
     if (m) setMsg(m, "❌ Error de JavaScript. Revisa consola (F12 → Console).", "bad");
   });
 
+  // Antes de saber el estado auth: solo login (no mostrar app)
+  showLoginOnly();
+  setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
+
   onAuthStateChanged(auth, async (user) => {
-    if (!user) {
+    if (!user){
       currentUser = null;
       currentProfile = null;
-      showLogin();
+      showLoginOnly();
       setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
       return;
     }
@@ -879,4 +1081,5 @@ function boot() {
 }
 
 boot();
+
 
