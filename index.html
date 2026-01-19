@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>APA - Depto. Personal | Sistema de Gestión</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand__title">Academia Politécnica Aeronáutica</div>
+      <div class="brand__subtitle">Departamento de Personal · Sistema de Gestión</div>
+    </div>
+
+    <div class="session">
+      <div class="session__user">
+        <div id="userName" class="session__name">No autenticado</div>
+        <div id="userRole" class="session__role">—</div>
+      </div>
+      <button id="btnLogout" class="btn btn--ghost" disabled>Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <!-- BLOQUE: INFORMACIÓN INSTITUCIONAL / PERMISOS -->
+    <section class="card">
+      <h2>Contexto y permisos</h2>
+      <p class="muted">
+        Este sistema web se desarrolla para el Departamento de Personal de la Academia Politécnica Aeronáutica (APA).
+        Para su puesta en marcha institucional se deben solicitar los permisos y autorizaciones correspondientes
+        (acceso a datos, responsables de información, roles y usuarios).
+      </p>
+      <p class="muted">
+        Personal de apoyo en el uso: <strong>Suboficial Rodrigo Arancibia</strong>, <strong>Maritza Aguila</strong>,
+        <strong>Camila Catalán</strong> y <strong>Cabo Alonso Parraguez</strong>.
+      </p>
+    </section>
+
+    <!-- LOGIN -->
+    <section class="card" id="loginCard">
+      <h2>Ingreso al sistema</h2>
+      <div class="grid2">
+        <div>
+          <label>Correo</label>
+          <input id="loginEmail" type="email" placeholder="usuario@dominio.cl" />
+        </div>
+        <div>
+          <label>Contraseña</label>
+          <input id="loginPassword" type="password" placeholder="••••••••" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btnLogin" class="btn">Ingresar</button>
+        <div id="loginMsg" class="msg"></div>
+      </div>
+      <p class="muted small">
+        *Los usuarios se gestionan en Firebase Authentication y su rol en la colección <code>users</code> de Firestore.
+      </p>
+    </section>
+
+    <!-- NAV -->
+    <nav class="tabs card" id="navTabs" hidden>
+      <button class="tab active" data-view="view-dashboard">Panel</button>
+      <button class="tab" data-view="view-entries">Entradas</button>
+      <button class="tab" data-view="view-assignments">Asignaciones</button>
+      <button class="tab" data-view="view-scrap">Merma</button>
+      <button class="tab" data-view="view-requests">Solicitudes</button>
+      <button class="tab" data-view="view-reports">Informes</button>
+    </nav>
+
+    <!-- DASHBOARD -->
+    <section class="card view" id="view-dashboard" hidden>
+      <h2>Panel de control</h2>
+      <div class="kpis">
+        <div class="kpi">
+          <div class="kpi__label">Entradas (últimos 30 días)</div>
+          <div class="kpi__value" id="kpiEntries">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Asignaciones (últimos 30 días)</div>
+          <div class="kpi__value" id="kpiAssignments">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Mermas (últimos 30 días)</div>
+          <div class="kpi__value" id="kpiScrap">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi__label">Solicitudes pendientes</div>
+          <div class="kpi__value" id="kpiPending">—</div>
+        </div>
+      </div>
+
+      <div class="split">
+        <div>
+          <h3>Últimas entradas</h3>
+          <div class="tableWrap">
+            <table class="table" id="tblLastEntries">
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Cant.</th><th>Disponible</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <h3>Últimas asignaciones</h3>
+          <div class="tableWrap">
+            <table class="table" id="tblLastAssignments">
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Trabajador</th><th>Entrada</th><th>Cant.</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENTRADAS -->
+    <section class="card view" id="view-entries" hidden>
+      <h2>Registro de Entradas</h2>
+
+      <div class="note">
+        <strong>Objetivo:</strong> registrar entradas con trazabilidad (quién/cuándo) y control de disponibilidad.
+      </div>
+
+      <form id="formEntry" class="form">
+        <div class="grid3">
+          <div>
+            <label>Fecha</label>
+            <input id="entryDate" type="date" required />
+          </div>
+          <div>
+            <label>Tipo</label>
+            <select id="entryType" required>
+              <option value="">Seleccionar…</option>
+              <option value="Documento">Documento</option>
+              <option value="Insumo">Insumo</option>
+              <option value="EPP">EPP</option>
+              <option value="Uniforme">Uniforme</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input id="entryQty" type="number" min="1" step="1" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>Descripción</label>
+            <input id="entryDesc" type="text" placeholder="Ej: Carpetas, formularios, EPP…" required />
+          </div>
+          <div>
+            <label>Referencia/Documento (opcional)</label>
+            <input id="entryRef" type="text" placeholder="Ej: OC-123, Acta, Memo…" />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Guardar entrada</button>
+          <div id="entryMsg" class="msg"></div>
+        </div>
+      </form>
+
+      <hr class="sep" />
+
+      <div class="filters">
+        <div>
+          <label>Filtrar por tipo</label>
+          <select id="filterEntryType">
+            <option value="">Todos</option>
+            <option value="Documento">Documento</option>
+            <option value="Insumo">Insumo</option>
+            <option value="EPP">EPP</option>
+            <option value="Uniforme">Uniforme</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label>Buscar texto</label>
+          <input id="filterEntryText" type="text" placeholder="Buscar en descripción o referencia…" />
+        </div>
+        <div class="filterBtn">
+          <button id="btnReloadEntries" class="btn btn--ghost" type="button">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" id="tblEntries">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th>Cant.</th><th>Disponible</th><th>Creado por</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ASIGNACIONES -->
+    <section class="card view" id="view-assignments" hidden>
+      <h2>Asignación a Trabajador</h2>
+
+      <div class="note">
+        <strong>Regla clave:</strong> no se puede asignar más cantidad que la disponible en la entrada.
+      </div>
+
+      <form id="formAssign" class="form">
+        <div class="grid3">
+          <div>
+            <label>Fecha</label>
+            <input id="assignDate" type="date" required />
+          </div>
+          <div>
+            <label>Trabajador</label>
+            <input id="assignWorker" type="text" placeholder="Nombre y Apellido" required />
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input id="assignQty" type="number" min="1" step="1" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>Entrada disponible (seleccionar)</label>
+            <select id="assignEntryId" required>
+              <option value="">Cargando entradas…</option>
+            </select>
+          </div>
+          <div>
+            <label>Motivo / Observación</label>
+            <input id="assignReason" type="text" placeholder="Ej: entrega por trámite X" required />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Guardar asignación</button>
+          <div id="assignMsg" class="msg"></div>
+        </div>
+      </form>
+
+      <hr class="sep" />
+
+      <div class="filters">
+        <div>
+          <label>Buscar trabajador</label>
+          <input id="filterAssignWorker" type="text" placeholder="Ej: Pérez" />
+        </div>
+        <div>
+          <label>Rango desde</label>
+          <input id="filterAssignFrom" type="date" />
+        </div>
+        <div>
+          <label>Rango hasta</label>
+          <input id="filterAssignTo" type="date" />
+        </div>
+        <div class="filterBtn">
+          <button id="btnReloadAssignments" class="btn btn--ghost" type="button">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" id="tblAssignments">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Trabajador</th><th>Entrada</th><th>Tipo</th><th>Descripción</th><th>Cant.</th><th>Responsable</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- MERMA -->
+    <section class="card view" id="view-scrap" hidden>
+      <h2>Registro de Merma</h2>
+
+      <div class="note">
+        <strong>Definición:</strong> Merma = pérdida o baja justificada (daño, extravío, vencimiento, etc.). Debe registrar motivo.
+      </div>
+
+      <form id="formScrap" class="form">
+        <div class="grid3">
+          <div>
+            <label>Fecha</label>
+            <input id="scrapDate" type="date" required />
+          </div>
+          <div>
+            <label>Entrada asociada</label>
+            <select id="scrapEntryId" required>
+              <option value="">Cargando entradas…</option>
+            </select>
+          </div>
+          <div>
+            <label>Cantidad</label>
+            <input id="scrapQty" type="number" min="1" step="1" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>Motivo</label>
+            <select id="scrapReason" required>
+              <option value="">Seleccionar…</option>
+              <option value="Daño">Daño</option>
+              <option value="Vencimiento">Vencimiento</option>
+              <option value="Extravío">Extravío</option>
+              <option value="Error de registro">Error de registro</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div>
+            <label>Detalle (obligatorio si eliges “Otro”)</label>
+            <input id="scrapDetail" type="text" placeholder="Detalle de la merma..." />
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Guardar merma</button>
+          <div id="scrapMsg" class="msg"></div>
+        </div>
+      </form>
+
+      <hr class="sep" />
+
+      <div class="tableWrap">
+        <table class="table" id="tblScrap">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Entrada</th><th>Tipo</th><th>Descripción</th><th>Cant.</th><th>Motivo</th><th>Registrado por</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- SOLICITUDES -->
+    <section class="card view" id="view-requests" hidden>
+      <h2>Solicitud de información vía web</h2>
+
+      <div class="note">
+        <strong>Objetivo:</strong> permitir que usuarios soliciten información (filtros) y que el área responda/registre atención.
+      </div>
+
+      <form id="formRequest" class="form">
+        <div class="grid3">
+          <div>
+            <label>Tipo de solicitud</label>
+            <select id="reqType" required>
+              <option value="">Seleccionar…</option>
+              <option value="Por trabajador">Por trabajador</option>
+              <option value="Por tipo">Por tipo</option>
+              <option value="Por fechas">Por fechas</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+          <div>
+            <label>Texto / Detalle</label>
+            <input id="reqText" type="text" placeholder="Ej: Solicito movimientos de X..." required />
+          </div>
+          <div>
+            <label>Prioridad</label>
+            <select id="reqPriority" required>
+              <option value="Normal">Normal</option>
+              <option value="Alta">Alta</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn" type="submit">Crear solicitud</button>
+          <div id="reqMsg" class="msg"></div>
+        </div>
+      </form>
+
+      <hr class="sep" />
+
+      <div class="filters">
+        <div>
+          <label>Estado</label>
+          <select id="filterReqStatus">
+            <option value="">Todos</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Respondida">Respondida</option>
+          </select>
+        </div>
+        <div>
+          <label>Buscar texto</label>
+          <input id="filterReqText" type="text" placeholder="Buscar..." />
+        </div>
+        <div class="filterBtn">
+          <button id="btnReloadRequests" class="btn btn--ghost" type="button">Actualizar</button>
+        </div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" id="tblRequests">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Prioridad</th><th>Estado</th><th>Respuesta</th><th>Acción</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p class="muted small">
+        Nota: Solo roles <strong>admin/operator</strong> pueden marcar una solicitud como respondida (según reglas).
+      </p>
+    </section>
+
+    <!-- INFORMES -->
+    <section class="card view" id="view-reports" hidden>
+      <h2>Informes (por trabajador / por tipo)</h2>
+
+      <div class="note">
+        <strong>Objetivo:</strong> entregar informes filtrables y exportables para toma de decisiones y revisión.
+      </div>
+
+      <div class="filters">
+        <div>
+          <label>Modo</label>
+          <select id="reportMode">
+            <option value="worker">Por trabajador</option>
+            <option value="type">Por tipo</option>
+          </select>
+        </div>
+
+        <div>
+          <label>Filtro</label>
+          <input id="reportFilter" type="text" placeholder="Ej: Pérez / EPP" />
+        </div>
+
+        <div>
+          <label>Desde</label>
+          <input id="reportFrom" type="date" />
+        </div>
+        <div>
+          <label>Hasta</label>
+          <input id="reportTo" type="date" />
+        </div>
+
+        <div class="filterBtn">
+          <button id="btnRunReport" class="btn" type="button">Generar</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="btnExportCSV" class="btn btn--ghost" type="button" disabled>Exportar CSV</button>
+        <div id="reportMsg" class="msg"></div>
+      </div>
+
+      <div class="tableWrap">
+        <table class="table" id="tblReport">
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>Entrada</th><th>Descripción</th><th>Cant.</th><th>Motivo</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <div class="totals">
+        <div><strong>Total registros:</strong> <span id="reportCount">0</span></div>
+        <div><strong>Total cantidad:</strong> <span id="reportQty">0</span></div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span>APA · Depto. Personal · Sistema de Gestión (TAP)</span>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
