@@ -26,6 +26,7 @@ import {
   query,
   orderBy,
   limit,
+  deleteDoc,
   updateDoc,
   setDoc,
   serverTimestamp,
@@ -216,6 +217,10 @@ function applyRoleToUI() {
   // Mostrar tab empleados solo admin
   const empTab = document.querySelector('[data-view="view-employees"]');
   if (empTab) empTab.hidden = !isAdmin();
+
+  // Mostrar tab Admin solo admin
+  const adminTab = document.querySelector('[data-view="view-admin"]');
+  if (adminTab) adminTab.hidden = !isAdmin();
 }
 
 /* =====================================================
@@ -325,7 +330,8 @@ async function preloadAll() {
   assignmentsCache = await fetchAssignments(800);
   scrapCache = await fetchScrap(800);
   requestsCache = await fetchRequests(800);
-  employeesCache = isAdmin() ? await fetchEmployees(1200) : [];
+  // Necesario para dropdowns de trabajador (asignación + informes) en TODOS los roles
+  employeesCache = await fetchEmployees(1200);
 }
 
 /* =====================================================
@@ -370,6 +376,7 @@ onAuthStateChanged(auth, async (u) => {
 
   await preloadAll();
   fillWorkersUIFromEmployees();
+  fillReportPrimarySelect();
   await refreshEntryDropdowns();
 
   await refreshDashboard();
@@ -377,6 +384,10 @@ onAuthStateChanged(auth, async (u) => {
   await refreshAssignments();
   await refreshScrap();
   await refreshRequests();
+
+  if (isAdmin()) {
+    await refreshAdminTable();
+  }
 
   if (isAdmin()) {
     await refreshEmployees();
@@ -583,9 +594,7 @@ on("formAssign", "submit", async (e) => {
   const qty = safeNum($("assignQty") ? $("assignQty").value : 0, 0);
   const reason = ($("assignReason") ? $("assignReason").value : "").trim();
 
-  const workerSelect = ($("assignWorkerSelect") ? $("assignWorkerSelect").value : "").trim();
-  const workerInput = ($("assignWorker") ? $("assignWorker").value : "").trim();
-  const worker = workerSelect || workerInput;
+  const worker = ($("assignWorkerSelect") ? $("assignWorkerSelect").value : "").trim();
 
   if (!dateISO || !entryId || qty <= 0 || !worker || !reason) {
     setMsg(msg, "Campos inválidos. Revisa fecha, trabajador, ítem, cantidad y motivo.", "warn");
@@ -668,7 +677,7 @@ async function refreshAssignments() {
   });
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="muted">Sin resultados</td></tr>';
     return;
   }
 
@@ -677,10 +686,9 @@ async function refreshAssignments() {
     tr.innerHTML =
       "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
       "<td>" + escapeHtml(r.worker || "") + "</td>" +
-      "<td>" + escapeHtml(r.entryId || "") + "</td>" +
-      "<td>" + escapeHtml(r.entryType || "") + "</td>" +
-      "<td>" + escapeHtml(r.entryDesc || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryLabel || (r.entryType || "") + " · " + (r.entryDesc || "")) + "</td>" +
       '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
+      "<td>" + escapeHtml(r.reason || "") + "</td>" +
       "<td>" + escapeHtml(r.createdByName || "") + "</td>";
     tbody.appendChild(tr);
   });
@@ -777,10 +785,11 @@ async function refreshScrap() {
 
   scrapCache.forEach((r) => {
     const motivo = r.reason === "Otro" ? (r.reason + ": " + (r.detail || "")) : (r.reason || "");
+    const itemLabel = r.entryLabel || ((r.entryType || "") + " · " + (r.entryDesc || "")).trim();
     const tr = document.createElement("tr");
     tr.innerHTML =
       "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
-      "<td>" + escapeHtml(r.entryId || "") + "</td>" +
+      "<td>" + escapeHtml(itemLabel) + "</td>" +
       "<td>" + escapeHtml(r.entryType || "") + "</td>" +
       "<td>" + escapeHtml(r.entryDesc || "") + "</td>" +
       '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
@@ -952,70 +961,99 @@ async function runReport() {
   assignmentsCache = await fetchAssignments(1200);
   scrapCache = await fetchScrap(1200);
 
-  const mode = $("reportMode") ? $("reportMode").value : "worker";
-
-  const workerSelect = ($("reportWorkerSelect") ? $("reportWorkerSelect").value : "").trim();
-  const filterText = ($("reportFilter") ? $("reportFilter").value : "").trim();
-  const effectiveFilter = workerSelect || filterText;
+  const mode = $("reportMode") ? $("reportMode").value : "assign_worker";
+  const primary = ($("reportPrimarySelect") ? $("reportPrimarySelect").value : "").trim();
+  const text = ($("reportFilter") ? $("reportFilter").value : "").trim().toLowerCase();
 
   const fromISO = $("reportFrom") ? $("reportFrom").value : "";
   const toISO = $("reportTo") ? $("reportTo").value : "";
 
   const rows = [];
 
-  assignmentsCache.forEach((a) => {
-    const ts = safeNum(a.dateTS);
-    if (!withinRange(ts, fromISO, toISO)) return;
+  // 1) Asignaciones por trabajador
+  if (mode === "assign_worker") {
+    assignmentsCache.forEach((a) => {
+      const ts = safeNum(a.dateTS);
+      if (!withinRange(ts, fromISO, toISO)) return;
+      if (primary && (a.worker || "") !== primary) return;
 
-    if (mode === "worker") {
-      if (effectiveFilter) {
-        const hay = (a.worker || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) return;
-      }
-    } else {
-      if (effectiveFilter) {
-        const hay = (a.entryType || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) return;
-      }
-    }
+      const hay = ((a.worker || "") + " " + (a.entryType || "") + " " + (a.entryDesc || "") + " " + (a.reason || "")).toLowerCase();
+      if (text && !hay.includes(text)) return;
 
-    rows.push({
-      Fecha: a.dateISO || "",
-      TipoMov: "Asignación",
-      TipoEntrada: a.entryType || "",
-      Trabajador: a.worker || "",
-      Entrada: a.entryId || "",
-      Descripcion: a.entryDesc || "",
-      Cantidad: safeNum(a.qty),
-      Motivo: a.reason || ""
+      rows.push({
+        Fecha: a.dateISO || "",
+        TipoMov: "Asignación",
+        TipoEntrada: a.entryType || "",
+        Trabajador: a.worker || "",
+        Entrada: a.entryId || "",
+        Descripcion: a.entryDesc || "",
+        Cantidad: safeNum(a.qty),
+        Motivo: a.reason || ""
+      });
     });
-  });
+  }
 
-  scrapCache.forEach((s) => {
-    const ts = safeNum(s.dateTS);
-    if (!withinRange(ts, fromISO, toISO)) return;
+  // 2) Movimientos por tipo (Asignación + Merma)
+  if (mode === "mov_type") {
+    assignmentsCache.forEach((a) => {
+      const ts = safeNum(a.dateTS);
+      if (!withinRange(ts, fromISO, toISO)) return;
+      if (primary && (a.entryType || "") !== primary) return;
+      const hay = ((a.worker || "") + " " + (a.entryType || "") + " " + (a.entryDesc || "") + " " + (a.reason || "")).toLowerCase();
+      if (text && !hay.includes(text)) return;
 
-    if (mode !== "worker") {
-      if (effectiveFilter) {
-        const hay = (s.entryType || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) return;
-      }
-    } else {
-      if (effectiveFilter) return;
-    }
-
-    const motivo = s.reason === "Otro" ? (s.reason + ": " + (s.detail || "")) : (s.reason || "");
-    rows.push({
-      Fecha: s.dateISO || "",
-      TipoMov: "Merma",
-      TipoEntrada: s.entryType || "",
-      Trabajador: "",
-      Entrada: s.entryId || "",
-      Descripcion: s.entryDesc || "",
-      Cantidad: safeNum(s.qty),
-      Motivo: motivo
+      rows.push({
+        Fecha: a.dateISO || "",
+        TipoMov: "Asignación",
+        TipoEntrada: a.entryType || "",
+        Trabajador: a.worker || "",
+        Entrada: a.entryId || "",
+        Descripcion: a.entryDesc || "",
+        Cantidad: safeNum(a.qty),
+        Motivo: a.reason || ""
+      });
     });
-  });
+
+    scrapCache.forEach((s) => {
+      const ts = safeNum(s.dateTS);
+      if (!withinRange(ts, fromISO, toISO)) return;
+      if (primary && (s.entryType || "") !== primary) return;
+      const motivo = s.reason === "Otro" ? (s.reason + ": " + (s.detail || "")) : (s.reason || "");
+      const hay = ((s.entryType || "") + " " + (s.entryDesc || "") + " " + motivo).toLowerCase();
+      if (text && !hay.includes(text)) return;
+
+      rows.push({
+        Fecha: s.dateISO || "",
+        TipoMov: "Merma",
+        TipoEntrada: s.entryType || "",
+        Trabajador: "",
+        Entrada: s.entryId || "",
+        Descripcion: s.entryDesc || "",
+        Cantidad: safeNum(s.qty),
+        Motivo: motivo
+      });
+    });
+  }
+
+  // 3) Stock actual (no depende de fechas)
+  if (mode === "stock") {
+    entriesCache.forEach((e) => {
+      if (primary && (e.type || "") !== primary) return;
+      const hay = ((e.type || "") + " " + (e.desc || "") + " " + (e.ref || "")).toLowerCase();
+      if (text && !hay.includes(text)) return;
+
+      rows.push({
+        Fecha: e.dateISO || "",
+        TipoMov: "Stock",
+        TipoEntrada: e.type || "",
+        Trabajador: "",
+        Entrada: e.id || "",
+        Descripcion: e.desc || "",
+        Cantidad: safeNum(e.available),
+        Motivo: "Disponible"
+      });
+    });
+  }
 
   rows.sort((a, b) => parseDateToTs(b.Fecha) - parseDateToTs(a.Fecha));
   reportRows = rows;
@@ -1060,6 +1098,219 @@ function renderReportTable(rows) {
       "<td>" + escapeHtml(r.Motivo || r.TipoMov) + "</td>";
     tbody.appendChild(tr);
   });
+}
+
+/* =====================================================
+   ADMIN (solo admin): eliminar / corregir BD
+===================================================== */
+on("btnAdminLoad", "click", async () => {
+  await loadAdminTable();
+});
+
+async function loadAdminTable() {
+  const msg = $("adminMsg");
+  if (!isAdmin()) {
+    setMsg(msg, "❌ Solo admin.", "bad");
+    return;
+  }
+
+  const entity = $("adminEntity") ? $("adminEntity").value : "assignments";
+  const n = safeNum($("adminLimit") ? $("adminLimit").value : 50, 50);
+
+  setMsg(msg, "Cargando...", "info");
+
+  let rows = [];
+  try {
+    rows = await fetchAdminEntity(entity, n);
+    renderAdminTable(entity, rows);
+    setMsg(msg, `✅ Listo (${rows.length}).`, "ok");
+  } catch (e) {
+    console.error(e);
+    setMsg(msg, "❌ No se pudo cargar. Revisa permisos/reglas.", "bad");
+  }
+}
+
+async function fetchAdminEntity(entity, n) {
+  const max = n || 50;
+  if (entity === "employees") {
+    const qRef = query(collection(db, "employees"), orderBy("name", "asc"), limit(max));
+    const snap = await getDocs(qRef);
+    const out = [];
+    snap.forEach((d) => out.push({ id: d.id, ...d.data() }));
+    return out;
+  }
+  if (entity === "requests") {
+    const qRef = query(collection(db, "requests"), orderBy("createdAt", "desc"), limit(max));
+    const snap = await getDocs(qRef);
+    const out = [];
+    snap.forEach((d) => out.push({ id: d.id, ...d.data() }));
+    return out;
+  }
+
+  // entries / assignments / scrap
+  const qRef = query(collection(db, entity), orderBy("dateTS", "desc"), limit(max));
+  const snap = await getDocs(qRef);
+  const out = [];
+  snap.forEach((d) => out.push({ id: d.id, ...d.data() }));
+  return out;
+}
+
+function renderAdminTable(entity, rows) {
+  const tbody = $("tblAdmin") ? $("tblAdmin").querySelector("tbody") : null;
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="muted">Sin datos</td></tr>';
+    return;
+  }
+
+  rows.forEach((r) => {
+    const tr = document.createElement("tr");
+
+    let fecha = "";
+    let detalle = "";
+    let cant = "";
+
+    if (entity === "assignments") {
+      fecha = r.dateISO || "";
+      detalle = `${r.worker || ""} · ${(r.entryLabel || (r.entryType || "") + " · " + (r.entryDesc || ""))}`;
+      cant = String(r.qty || 0);
+    } else if (entity === "scrap") {
+      fecha = r.dateISO || "";
+      detalle = `${r.entryLabel || (r.entryType || "") + " · " + (r.entryDesc || "")}`;
+      cant = String(r.qty || 0);
+    } else if (entity === "entries") {
+      fecha = r.dateISO || "";
+      detalle = `${r.type || ""} · ${r.desc || ""} (Disp: ${String(r.available || 0)})`;
+      cant = String(r.qty || 0);
+    } else if (entity === "requests") {
+      fecha = formatTimestamp(r.createdAt) || "";
+      detalle = `${r.type || ""} · ${r.text || ""}`;
+      cant = (r.status || "");
+    } else if (entity === "employees") {
+      fecha = "—";
+      detalle = `${r.name || ""} · ${r.email || ""} · rol: ${r.role || ""} · activo: ${r.active === false ? "No" : "Sí"}`;
+      cant = "";
+    }
+
+    tr.innerHTML =
+      "<td>" + escapeHtml(fecha) + "</td>" +
+      "<td>" + escapeHtml(detalle) + "</td>" +
+      '<td class="right">' + escapeHtml(cant) + "</td>" +
+      '<td><button class="btn btn--danger" data-entity="' + escapeHtml(entity) + '" data-id="' + escapeHtml(r.id) + '">Eliminar</button></td>';
+
+    tbody.appendChild(tr);
+  });
+
+  tbody.onclick = async (ev) => {
+    const btn = ev.target.closest("button[data-id]");
+    if (!btn) return;
+    const entity = btn.dataset.entity;
+    const id = btn.dataset.id;
+    await adminDeleteEntity(entity, id);
+  };
+}
+
+async function adminDeleteEntity(entity, id) {
+  if (!isAdmin()) return;
+  const msg = $("adminMsg");
+
+  const ok = confirm(`¿Eliminar definitivamente este registro (${entity})?`);
+  if (!ok) return;
+
+  try {
+    // Asignación: devolver stock y borrar
+    if (entity === "assignments") {
+      await runTransaction(db, async (tx) => {
+        const aRef = doc(db, "assignments", id);
+        const aSnap = await tx.get(aRef);
+        if (!aSnap.exists()) throw new Error("NOT_FOUND");
+        const a = aSnap.data();
+
+        const entryId = a.entryId;
+        const qty = safeNum(a.qty, 0);
+        if (entryId && qty > 0) {
+          const eRef = doc(db, "entries", entryId);
+          const eSnap = await tx.get(eRef);
+          if (eSnap.exists()) {
+            const e = eSnap.data();
+            const avail = safeNum(e.available, 0);
+            tx.update(eRef, { available: avail + qty });
+          }
+        }
+        tx.delete(aRef);
+      });
+      setMsg(msg, "✅ Asignación eliminada (stock repuesto).", "ok");
+    }
+
+    // Merma: devolver stock y borrar
+    else if (entity === "scrap") {
+      await runTransaction(db, async (tx) => {
+        const sRef = doc(db, "scrap", id);
+        const sSnap = await tx.get(sRef);
+        if (!sSnap.exists()) throw new Error("NOT_FOUND");
+        const s = sSnap.data();
+
+        const entryId = s.entryId;
+        const qty = safeNum(s.qty, 0);
+        if (entryId && qty > 0) {
+          const eRef = doc(db, "entries", entryId);
+          const eSnap = await tx.get(eRef);
+          if (eSnap.exists()) {
+            const e = eSnap.data();
+            const avail = safeNum(e.available, 0);
+            tx.update(eRef, { available: avail + qty });
+          }
+        }
+        tx.delete(sRef);
+      });
+      setMsg(msg, "✅ Merma eliminada (stock repuesto).", "ok");
+    }
+
+    // Entrada: solo si no tiene movimientos asociados
+    else if (entity === "entries") {
+      // Bloqueo simple usando caché local
+      const hasAssign = (assignmentsCache || []).some((a) => a.entryId === id);
+      const hasScrap = (scrapCache || []).some((s) => s.entryId === id);
+      if (hasAssign || hasScrap) {
+        setMsg(msg, "❌ No se puede eliminar esta entrada: tiene asignaciones y/o mermas asociadas.", "warn");
+        return;
+      }
+      await deleteDoc(doc(db, "entries", id));
+      setMsg(msg, "✅ Entrada eliminada.", "ok");
+    }
+
+    // Solicitud
+    else if (entity === "requests") {
+      await deleteDoc(doc(db, "requests", id));
+      setMsg(msg, "✅ Solicitud eliminada.", "ok");
+    }
+
+    // Empleado (perfil): elimina documents employees/{uid} y users/{uid}. Auth NO se elimina.
+    else if (entity === "employees") {
+      await deleteDoc(doc(db, "employees", id));
+      try { await deleteDoc(doc(db, "users", id)); } catch {}
+      setMsg(msg, "✅ Perfil eliminado (Auth queda intacto).", "ok");
+    }
+
+    // Refrescar caches clave
+    await preloadAll();
+    fillWorkersUIFromEmployees();
+    await refreshEntryDropdowns();
+    await refreshDashboard();
+    await refreshEntries();
+    await refreshAssignments();
+    await refreshScrap();
+    await refreshRequests();
+    if (isAdmin()) await refreshEmployees();
+
+    // Recargar admin table
+    await loadAdminTable();
+  } catch (e) {
+    console.error(e);
+    setMsg(msg, "❌ No se pudo eliminar (¿permisos?).", "bad");
+  }
 }
 
 /* =====================================================
@@ -1183,13 +1434,35 @@ function fillWorkersUIFromEmployees() {
       active.map((e) => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
   }
 
-  const selReport = $("reportWorkerSelect");
-  if (selReport) {
-    selReport.innerHTML =
+  fillReportPrimarySelect();
+}
+
+/* =====================================================
+   INFORMES - UI coherente
+===================================================== */
+function fillReportPrimarySelect() {
+  const mode = $("reportMode") ? $("reportMode").value : "assign_worker";
+  const sel = $("reportPrimarySelect");
+  if (!sel) return;
+
+  if (mode === "assign_worker") {
+    const active = (employeesCache || []).filter((e) => e.active !== false);
+    sel.innerHTML =
       '<option value="">(Todos / sin filtro)</option>' +
       active.map((e) => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
+    return;
   }
+
+  // Para movimientos por tipo y stock: filtrar por tipo de entrada
+  const types = ["EPP", "Uniforme", "Documentación", "Insumo", "Otro"];
+  sel.innerHTML =
+    '<option value="">(Todos los tipos)</option>' +
+    types.map((t) => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
 }
+
+on("reportMode", "change", () => {
+  fillReportPrimarySelect();
+});
 
 /* =====================================================
    BOOT
