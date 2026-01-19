@@ -1,9 +1,8 @@
 /******************************************************
- * APA - Depto. Personal (TAP)
- * app.js - FULL
- * - Firebase Auth + Firestore (Web Modules)
- * - Roles: admin / operator / consulta
- * - Módulos: Dashboard, Entradas, Asignaciones, Merma, Solicitudes, Informes, Empleados (admin)
+ * APA - Sistema de Registros (TAP)
+ * app.js FINAL FINAL
+ * Requiere firebase.js exportando:
+ *   export const auth, db, secondaryAuth
  ******************************************************/
 
 import { auth, db, secondaryAuth } from "./firebase.js";
@@ -23,7 +22,6 @@ import {
   getDoc,
   getDocs,
   query,
-  where,
   orderBy,
   limit,
   updateDoc,
@@ -42,7 +40,7 @@ import {
 } from "./utils.js";
 
 /* ---------------------------------------------------
-   Helpers DOM (seguro: no rompe si no existe el id)
+   Helpers DOM
 --------------------------------------------------- */
 const $ = (id) => document.getElementById(id);
 
@@ -77,6 +75,7 @@ function scrollTopInstant() {
 --------------------------------------------------- */
 const loginCard = $("loginCard");
 const navTabs = $("navTabs");
+const appShell = $("appShell");
 const btnLogout = $("btnLogout");
 const userName = $("userName");
 const userRole = $("userRole");
@@ -88,61 +87,62 @@ const views = qsa(".view");
 function showView(viewId) {
   views.forEach(v => v.hidden = (v.id !== viewId));
   qsa(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === viewId));
-  // al cambiar vista, evitamos quedarte “abajo”
   scrollTopInstant();
 }
 
 document.addEventListener("click", (e) => {
   const tab = e.target.closest(".tab");
   if (!tab) return;
-  if (!tab.dataset.view) return;
-  showView(tab.dataset.view);
+  const viewId = tab.dataset.view;
+  if (!viewId) return;
+  showView(viewId);
 });
 
 /* ---------------------------------------------------
-   Defaults
+   Default dates
 --------------------------------------------------- */
 ["entryDate", "assignDate", "scrapDate"].forEach(id => {
   if (exists(id)) $(id).value = todayISO();
 });
 
 /* ---------------------------------------------------
-   Session + Role
+   Session + caches
 --------------------------------------------------- */
 let currentUser = null;
-let currentUserProfile = null; // /users/{uid}
+let currentUserProfile = null;
+
+let entriesCache = [];
+let assignmentsCache = [];
+let scrapCache = [];
+let requestsCache = [];
+let employeesCache = [];
+
 let reportRows = [];
 
-// Caches
-let entriesCache = [];        // entries[]
-let assignmentsCache = [];    // assignments[]
-let scrapCache = [];          // scrap[]
-let requestsCache = [];       // requests[]
-let employeesCache = [];      // employees[] (admin)
-
+/* ---------------------------------------------------
+   Roles
+--------------------------------------------------- */
 function role() {
   return currentUserProfile?.role || "consulta";
 }
-
 function canWrite() {
   const r = role();
   return r === "admin" || r === "operator";
 }
-
 function isAdmin() {
   return role() === "admin";
 }
 
 /* ---------------------------------------------------
-   UI state control (Login profesional)
+   UI state control
 --------------------------------------------------- */
 function showLoginOnly() {
   if (loginCard) loginCard.hidden = false;
   if (navTabs) navTabs.hidden = true;
+  if (appShell) appShell.hidden = true;
   views.forEach(v => v.hidden = true);
   if (btnLogout) btnLogout.disabled = true;
 
-  // limpia nombre
   if (userName) userName.textContent = "No autenticado";
   if (userRole) userRole.textContent = "—";
 
@@ -151,26 +151,17 @@ function showLoginOnly() {
 
 function showAppShell() {
   if (loginCard) loginCard.hidden = true;
+  if (appShell) appShell.hidden = false;
   if (navTabs) navTabs.hidden = false;
   if (btnLogout) btnLogout.disabled = false;
-
   scrollTopInstant();
 }
 
 /* ---------------------------------------------------
-   Load profile from Firestore
---------------------------------------------------- */
-async function loadUserProfile(uid) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
-  return snap.exists() ? snap.data() : null;
-}
-
-/* ---------------------------------------------------
-   Apply role restrictions to UI
+   Apply role to UI
 --------------------------------------------------- */
 function applyRoleToUI() {
-  // forms: disable submit button if not writer
+  // Forms (disable submit if cannot write)
   const writer = canWrite();
 
   const formEntry = $("formEntry");
@@ -191,13 +182,56 @@ function applyRoleToUI() {
     if (b) b.disabled = !writer;
   }
 
-  // Empleados (si existe tab)
+  // Requests: everyone can create (no restriction)
+
+  // Employees tab only admin
   const empTabBtn = document.querySelector('[data-view="view-employees"]');
   if (empTabBtn) empTabBtn.hidden = !isAdmin();
+
+  // If not admin and currently in employees view, go dashboard
+  if (!isAdmin() && $("view-employees") && !$("view-employees").hidden) {
+    showView("view-dashboard");
+  }
 }
 
 /* ---------------------------------------------------
-   AUTH - login/logout
+   Password toggles
+--------------------------------------------------- */
+function setupPasswordToggles() {
+  // Login
+  on("btnTogglePassword", "click", () => {
+    const input = $("loginPassword");
+    const btn = $("btnTogglePassword");
+    if (!input || !btn) return;
+
+    const isPwd = input.type === "password";
+    input.type = isPwd ? "text" : "password";
+    btn.textContent = isPwd ? "🙈" : "👁️";
+  });
+
+  // Employee create (admin)
+  on("btnToggleEmpPass", "click", () => {
+    const input = $("empPass");
+    const btn = $("btnToggleEmpPass");
+    if (!input || !btn) return;
+
+    const isPwd = input.type === "password";
+    input.type = isPwd ? "text" : "password";
+    btn.textContent = isPwd ? "🙈" : "👁️";
+  });
+}
+
+/* ---------------------------------------------------
+   Load profile /users/{uid}
+--------------------------------------------------- */
+async function loadUserProfile(uid) {
+  const ref = doc(db, "users", uid);
+  const snap = await getDoc(ref);
+  return snap.exists() ? snap.data() : null;
+}
+
+/* ---------------------------------------------------
+   AUTH Handlers
 --------------------------------------------------- */
 on("btnLogin", "click", async () => {
   const email = ($("loginEmail")?.value || "").trim();
@@ -210,22 +244,26 @@ on("btnLogin", "click", async () => {
     return;
   }
 
+  // feedback
   setMsg(msg, "Verificando credenciales...", "info");
 
   try {
     await signInWithEmailAndPassword(auth, email, password);
-    setMsg(msg, "✅ Ingreso exitoso. Cargando sistema...", "ok");
+    setMsg(msg, "✅ Ingreso exitoso. Cargando...", "ok");
   } catch (err) {
     console.error(err);
     const code = err?.code || "";
+
     if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
       setMsg(msg, "❌ Correo o contraseña incorrectos.", "bad");
     } else if (code.includes("auth/user-not-found")) {
-      setMsg(msg, "❌ Usuario no existe en Firebase Auth.", "bad");
+      setMsg(msg, "❌ No existe un usuario con ese correo.", "bad");
     } else if (code.includes("auth/unauthorized-domain")) {
-      setMsg(msg, "❌ Dominio no autorizado en Firebase Auth (Authorized domains).", "bad");
+      setMsg(msg, "❌ Dominio no autorizado. Agrega 'mandu619.github.io' en Firebase Auth → Authorized domains.", "bad");
+    } else if (code.includes("auth/too-many-requests")) {
+      setMsg(msg, "⚠️ Demasiados intentos. Espera un momento y prueba otra vez.", "warn");
     } else {
-      setMsg(msg, `❌ Error de autenticación (${code || "desconocido"}).`, "bad");
+      setMsg(msg, `❌ Error al ingresar (${code || "desconocido"}).`, "bad");
     }
   }
 });
@@ -244,38 +282,33 @@ onAuthStateChanged(auth, async (u) => {
   if (!u) {
     currentUserProfile = null;
     showLoginOnly();
-    // Mensaje inicial
     setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
     return;
   }
 
-  // ya autenticado
+  // Logged
   currentUserProfile = await loadUserProfile(u.uid);
 
   if (!currentUserProfile) {
-    // Usuario existe en Auth pero falta perfil /users
     showLoginOnly();
     setMsg(
       $("loginMsg"),
-      "⚠️ Tu usuario existe en Authentication, pero falta tu documento en Firestore: users/{uid}. Pide al admin crearlo.",
+      "⚠️ Usuario existe en Authentication, pero falta su perfil en Firestore: users/{uid}. Pide al admin crearlo.",
       "warn"
     );
-    // opcional: cerrar sesión para forzar corrección
-    // await signOut(auth);
     return;
   }
 
-  // Set topbar
   if (userName) userName.textContent = currentUserProfile.name || u.email || "Usuario";
   if (userRole) userRole.textContent = `Rol: ${currentUserProfile.role || "—"}`;
 
-  applyRoleToUI();
   showAppShell();
+  applyRoleToUI();
 
-  // Vista inicial
+  // start in dashboard
   showView("view-dashboard");
 
-  // Cargar data inicial
+  // Load data
   await preloadAll();
   await refreshDashboard();
   await refreshEntries();
@@ -284,38 +317,32 @@ onAuthStateChanged(auth, async (u) => {
   await refreshScrap();
   await refreshRequests();
 
-  // cargar empleados si admin (si la vista existe)
   if (isAdmin()) {
-    await refreshEmployees(); // si no existe UI, no rompe
+    await refreshEmployees();
   }
+
+  // Populate selects
+  fillWorkersUIFromEmployees();
 });
 
 /* ---------------------------------------------------
-   Preload caches (para informes y dashboard)
+   Preload caches
 --------------------------------------------------- */
 async function preloadAll() {
-  // Entradas
-  entriesCache = await fetchEntries(400);
+  entriesCache = await fetchEntries(500);
+  assignmentsCache = await fetchAssignments(500);
+  scrapCache = await fetchScrap(500);
+  requestsCache = await fetchRequests(500);
 
-  // Asignaciones
-  assignmentsCache = await fetchAssignments(400);
-
-  // Merma
-  scrapCache = await fetchScrap(400);
-
-  // Solicitudes
-  requestsCache = await fetchRequests(400);
-
-  // Empleados (solo admin, pero si no hay permisos, no rompe)
   if (isAdmin()) {
-    employeesCache = await fetchEmployees(500);
+    employeesCache = await fetchEmployees(1000);
   } else {
     employeesCache = [];
   }
 }
 
 /* ---------------------------------------------------
-   Firestore fetch functions
+   Fetch functions
 --------------------------------------------------- */
 async function fetchEntries(n = 200) {
   try {
@@ -370,7 +397,6 @@ async function fetchRequests(n = 200) {
 }
 
 async function fetchEmployees(n = 200) {
-  // colección employees (admin)
   try {
     const qRef = query(collection(db, "employees"), orderBy("name", "asc"), limit(n));
     const snap = await getDocs(qRef);
@@ -387,10 +413,8 @@ async function fetchEmployees(n = 200) {
    Dashboard
 --------------------------------------------------- */
 async function refreshDashboard() {
-  // KPIs
   const now = Date.now();
-  const days30 = 30 * 24 * 60 * 60 * 1000;
-  const since = now - days30;
+  const since = now - 30 * 24 * 60 * 60 * 1000;
 
   const entries30 = entriesCache.filter(e => safeNum(e.dateTS) >= since).length;
   const assigns30 = assignmentsCache.filter(a => safeNum(a.dateTS) >= since).length;
@@ -403,7 +427,6 @@ async function refreshDashboard() {
   if (exists("kpiScrap")) $("kpiScrap").textContent = String(scrap30);
   if (exists("kpiPending")) $("kpiPending").textContent = String(pending);
 
-  // Tablas últimas entradas / asignaciones
   renderLastEntries(entriesCache.slice(0, 6));
   renderLastAssignments(assignmentsCache.slice(0, 6));
 }
@@ -495,7 +518,7 @@ on("formEntry", "submit", async (e) => {
     e.target.reset();
     if (exists("entryDate")) $("entryDate").value = todayISO();
 
-    entriesCache = await fetchEntries(400);
+    entriesCache = await fetchEntries(500);
     await refreshEntries();
     await refreshEntryDropdowns();
     await refreshDashboard();
@@ -506,7 +529,7 @@ on("formEntry", "submit", async (e) => {
 });
 
 on("btnReloadEntries", "click", async () => {
-  entriesCache = await fetchEntries(400);
+  entriesCache = await fetchEntries(500);
   await refreshEntries();
   await refreshEntryDropdowns();
   await refreshDashboard();
@@ -547,10 +570,9 @@ async function refreshEntries() {
   }
 }
 
-/* Dropdowns de entradas (Asignación / Merma) */
+/* Dropdowns */
 async function refreshEntryDropdowns() {
   const list = entriesCache.slice().sort((a, b) => safeNum(b.dateTS) - safeNum(a.dateTS));
-
   const assignsSel = $("assignEntryId");
   const scrapSel = $("scrapEntryId");
 
@@ -563,7 +585,6 @@ async function refreshEntryDropdowns() {
     assignsSel.innerHTML = `<option value="">Seleccionar…</option>` +
       list.filter(e => safeNum(e.available) > 0).map(optHtml).join("");
   }
-
   if (scrapSel) {
     scrapSel.innerHTML = `<option value="">Seleccionar…</option>` +
       list.filter(e => safeNum(e.available) > 0).map(optHtml).join("");
@@ -571,7 +592,7 @@ async function refreshEntryDropdowns() {
 }
 
 /* ---------------------------------------------------
-   ASIGNACIONES (transaction para descontar disponibilidad)
+   ASIGNACIONES
 --------------------------------------------------- */
 on("formAssign", "submit", async (e) => {
   e.preventDefault();
@@ -588,13 +609,12 @@ on("formAssign", "submit", async (e) => {
   const qty = safeNum($("assignQty")?.value, 0);
   const reason = ($("assignReason")?.value || "").trim();
 
-  // trabajador: si existe selector, úsalo; si no, usa input
-  const workerInput = ($("assignWorker")?.value || "").trim();
   const workerSelect = ($("assignWorkerSelect")?.value || "").trim();
+  const workerInput = ($("assignWorker")?.value || "").trim();
   const worker = workerSelect || workerInput;
 
   if (!dateISO || !entryId || qty <= 0 || !worker || !reason) {
-    setMsg(msg, "Campos inválidos. Revisa fecha, trabajador, entrada, cantidad y motivo.", "warn");
+    setMsg(msg, "Campos inválidos. Revisa fecha, trabajador, ítem, cantidad y motivo.", "warn");
     return;
   }
 
@@ -608,10 +628,8 @@ on("formAssign", "submit", async (e) => {
       const available = safeNum(entry.available, 0);
       if (qty > available) throw new Error("NO_STOCK");
 
-      // update available
       tx.update(entryRef, { available: available - qty });
 
-      // add assignment
       const label = `${entry.type || ""} · ${entry.desc || ""}`;
       const assignRef = doc(collection(db, "assignments"));
 
@@ -631,13 +649,12 @@ on("formAssign", "submit", async (e) => {
       });
     });
 
-    setMsg(msg, "✅ Asignación registrada correctamente.", "ok");
+    setMsg(msg, "✅ Asignación registrada.", "ok");
     e.target.reset();
     if (exists("assignDate")) $("assignDate").value = todayISO();
 
-    // refresh caches
-    entriesCache = await fetchEntries(400);
-    assignmentsCache = await fetchAssignments(400);
+    entriesCache = await fetchEntries(500);
+    assignmentsCache = await fetchAssignments(500);
 
     await refreshEntryDropdowns();
     await refreshAssignments();
@@ -645,15 +662,15 @@ on("formAssign", "submit", async (e) => {
   } catch (err) {
     console.error(err);
     if (String(err.message).includes("NO_STOCK")) {
-      setMsg(msg, "❌ Cantidad supera disponible de la entrada.", "bad");
+      setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
-      setMsg(msg, "❌ No se pudo guardar la asignación. Revisa permisos/reglas.", "bad");
+      setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
     }
   }
 });
 
 on("btnReloadAssignments", "click", async () => {
-  assignmentsCache = await fetchAssignments(400);
+  assignmentsCache = await fetchAssignments(500);
   await refreshAssignments();
   await refreshDashboard();
 });
@@ -695,7 +712,7 @@ async function refreshAssignments() {
 }
 
 /* ---------------------------------------------------
-   MERMA (transaction para descontar disponibilidad)
+   MERMA
 --------------------------------------------------- */
 on("formScrap", "submit", async (e) => {
   e.preventDefault();
@@ -714,7 +731,7 @@ on("formScrap", "submit", async (e) => {
   const detail = ($("scrapDetail")?.value || "").trim();
 
   if (!dateISO || !entryId || qty <= 0 || !reason) {
-    setMsg(msg, "Campos inválidos. Revisa fecha, entrada, cantidad y motivo.", "warn");
+    setMsg(msg, "Campos inválidos. Revisa fecha, ítem, cantidad y motivo.", "warn");
     return;
   }
   if (reason === "Otro" && !detail) {
@@ -753,12 +770,12 @@ on("formScrap", "submit", async (e) => {
       });
     });
 
-    setMsg(msg, "✅ Merma registrada correctamente.", "ok");
+    setMsg(msg, "✅ Merma registrada.", "ok");
     e.target.reset();
     if (exists("scrapDate")) $("scrapDate").value = todayISO();
 
-    entriesCache = await fetchEntries(400);
-    scrapCache = await fetchScrap(400);
+    entriesCache = await fetchEntries(500);
+    scrapCache = await fetchScrap(500);
 
     await refreshEntryDropdowns();
     await refreshScrap();
@@ -766,9 +783,9 @@ on("formScrap", "submit", async (e) => {
   } catch (err) {
     console.error(err);
     if (String(err.message).includes("NO_STOCK")) {
-      setMsg(msg, "❌ Cantidad supera disponible de la entrada.", "bad");
+      setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
-      setMsg(msg, "❌ No se pudo guardar la merma. Revisa permisos/reglas.", "bad");
+      setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
     }
   }
 });
@@ -778,14 +795,13 @@ async function refreshScrap() {
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const rows = scrapCache;
-  if (!rows.length) {
+  if (!scrapCache.length) {
     tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin datos</td></tr>`;
     return;
   }
 
-  for (const r of rows) {
-    const motivo = r.reason === "Otro" ? `${r.reason}: ${r.detail || ""}` : r.reason || "";
+  for (const r of scrapCache) {
+    const motivo = r.reason === "Otro" ? `${r.reason}: ${r.detail || ""}` : (r.reason || "");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(r.dateISO || "")}</td>
@@ -802,8 +818,6 @@ async function refreshScrap() {
 
 /* ---------------------------------------------------
    SOLICITUDES
-   - cualquier usuario crea
-   - admin/operator responde
 --------------------------------------------------- */
 on("formRequest", "submit", async (e) => {
   e.preventDefault();
@@ -834,17 +848,17 @@ on("formRequest", "submit", async (e) => {
     setMsg(msg, "✅ Solicitud creada.", "ok");
     e.target.reset();
 
-    requestsCache = await fetchRequests(400);
+    requestsCache = await fetchRequests(500);
     await refreshRequests();
     await refreshDashboard();
   } catch (err) {
     console.error(err);
-    setMsg(msg, "❌ No se pudo crear la solicitud. Revisa permisos/reglas.", "bad");
+    setMsg(msg, "❌ No se pudo crear. Revisa permisos/reglas.", "bad");
   }
 });
 
 on("btnReloadRequests", "click", async () => {
-  requestsCache = await fetchRequests(400);
+  requestsCache = await fetchRequests(500);
   await refreshRequests();
   await refreshDashboard();
 });
@@ -885,21 +899,18 @@ async function refreshRequests() {
       <td>${escapeHtml(r.status || "")}</td>
       <td>${escapeHtml(r.response || "")}</td>
       <td>
-        ${canAnswer ? `
-          <button class="btn btn--ghost" data-action="answer" data-id="${escapeHtml(r.id)}">Responder</button>
-        ` : `<span class="muted small">—</span>`}
+        ${canAnswer ? `<button class="btn btn--ghost" data-action="answer" data-id="${escapeHtml(r.id)}">Responder</button>` : `<span class="muted small">—</span>`}
       </td>
     `;
     tbody.appendChild(tr);
   }
 
-  // handler acciones (delegación)
   tbody.onclick = async (ev) => {
     const btn = ev.target.closest("button[data-action]");
     if (!btn) return;
-    const act = btn.dataset.action;
-    const id = btn.dataset.id;
-    if (act === "answer") await answerRequest(id);
+    if (btn.dataset.action === "answer") {
+      await answerRequest(btn.dataset.id);
+    }
   };
 }
 
@@ -907,7 +918,7 @@ async function answerRequest(requestId) {
   if (!canWrite()) return;
 
   const response = prompt("Ingrese respuesta (quedará registrada):");
-  if (response === null) return; // cancel
+  if (response === null) return;
   const txt = response.trim();
   if (!txt) return;
 
@@ -921,7 +932,7 @@ async function answerRequest(requestId) {
       respondedAt: serverTimestamp()
     });
 
-    requestsCache = await fetchRequests(400);
+    requestsCache = await fetchRequests(500);
     await refreshRequests();
     await refreshDashboard();
   } catch (e) {
@@ -932,10 +943,6 @@ async function answerRequest(requestId) {
 
 /* ---------------------------------------------------
    INFORMES
-   - Incluye Asignaciones + Mermas
-   - Resumen: total registros, total cantidad (movimientos),
-     total merma, total stock restante (sum entries.available)
-   - Usa selector de trabajadores si existe (reportWorkerSelect)
 --------------------------------------------------- */
 on("btnRunReport", "click", async () => {
   await runReport();
@@ -943,7 +950,6 @@ on("btnRunReport", "click", async () => {
 
 on("btnExportCSV", "click", () => {
   if (!reportRows?.length) return;
-
   const headers = ["Fecha", "TipoMov", "TipoEntrada", "Trabajador", "Entrada", "Descripcion", "Cantidad", "Motivo"];
   const csv = toCSV(reportRows, headers);
   downloadText("reporte_apa.csv", csv, "text/csv");
@@ -953,36 +959,31 @@ async function runReport() {
   const msg = $("reportMsg");
   setMsg(msg, "Generando informe...", "info");
 
-  // Asegurar caches actualizados
-  entriesCache = await fetchEntries(500);
-  assignmentsCache = await fetchAssignments(500);
-  scrapCache = await fetchScrap(500);
+  entriesCache = await fetchEntries(1000);
+  assignmentsCache = await fetchAssignments(1000);
+  scrapCache = await fetchScrap(1000);
 
   const mode = $("reportMode")?.value || "worker";
 
-  // filtro principal: input o selector
-  const filterText = ($("reportFilter")?.value || "").trim();
   const workerSelect = ($("reportWorkerSelect")?.value || "").trim();
+  const filterText = ($("reportFilter")?.value || "").trim();
   const effectiveFilter = workerSelect || filterText;
 
   const fromISO = $("reportFrom")?.value || "";
   const toISO = $("reportTo")?.value || "";
 
-  // construimos filas
   const rows = [];
 
-  // Asignaciones
   for (const a of assignmentsCache) {
     const ts = safeNum(a.dateTS);
     if (!withinRange(ts, fromISO, toISO)) continue;
 
-    // filtros
     if (mode === "worker") {
       if (effectiveFilter) {
         const hay = (a.worker || "").toLowerCase();
         if (!hay.includes(effectiveFilter.toLowerCase())) continue;
       }
-    } else { // type
+    } else {
       if (effectiveFilter) {
         const hay = (a.entryType || "").toLowerCase();
         if (!hay.includes(effectiveFilter.toLowerCase())) continue;
@@ -1001,13 +1002,11 @@ async function runReport() {
     });
   }
 
-  // Mermas
   for (const s of scrapCache) {
     const ts = safeNum(s.dateTS);
     if (!withinRange(ts, fromISO, toISO)) continue;
 
     if (mode === "worker") {
-      // merma no tiene trabajador; si filtras por trabajador, igual la mostramos solo si NO hay filtro
       if (effectiveFilter) continue;
     } else {
       if (effectiveFilter) {
@@ -1029,34 +1028,22 @@ async function runReport() {
     });
   }
 
-  // orden por fecha desc
-  rows.sort((a, b) => {
-    const ta = parseDateToTs(a.Fecha) || 0;
-    const tb = parseDateToTs(b.Fecha) || 0;
-    return tb - ta;
-  });
+  rows.sort((a, b) => (parseDateToTs(b.Fecha) || 0) - (parseDateToTs(a.Fecha) || 0));
 
   reportRows = rows;
   renderReportTable(rows);
 
-  // resumen
   const totalCount = rows.length;
   const totalQty = rows.reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
 
-  const totalScrap = rows
-    .filter(r => r.TipoMov === "Merma")
-    .reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
-
+  const totalScrap = rows.filter(r => r.TipoMov === "Merma").reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
   const totalRemaining = entriesCache.reduce((acc, e) => acc + safeNum(e.available), 0);
 
   if (exists("reportCount")) $("reportCount").textContent = String(totalCount);
   if (exists("reportQty")) $("reportQty").textContent = String(totalQty);
-
-  // si tienes estos spans en HTML, se rellenan; si no, no rompe
   if (exists("reportScrapTotal")) $("reportScrapTotal").textContent = String(totalScrap);
   if (exists("reportRemainingTotal")) $("reportRemainingTotal").textContent = String(totalRemaining);
 
-  // habilita export
   const btnCSV = $("btnExportCSV");
   if (btnCSV) btnCSV.disabled = rows.length === 0;
 
@@ -1090,9 +1077,6 @@ function renderReportTable(rows) {
 
 /* ---------------------------------------------------
    EMPLEADOS (ADMIN)
-   - crea usuario en Auth con secondaryAuth
-   - guarda en Firestore: employees/{uid} y users/{uid}
-   - también llena selectores de trabajadores
 --------------------------------------------------- */
 on("btnCreateEmployee", "click", async () => {
   const msg = $("empMsg");
@@ -1120,7 +1104,6 @@ on("btnCreateEmployee", "click", async () => {
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
 
-    // displayName opcional
     try {
       await updateProfile(cred.user, { displayName: `${first} ${last}` });
     } catch {}
@@ -1152,7 +1135,7 @@ on("btnCreateEmployee", "click", async () => {
       active
     });
 
-    // limpiar
+    // Clear
     if (exists("empFirst")) $("empFirst").value = "";
     if (exists("empLast")) $("empLast").value = "";
     if (exists("empEmail")) $("empEmail").value = "";
@@ -1164,7 +1147,6 @@ on("btnCreateEmployee", "click", async () => {
 
     await refreshEmployees();
     fillWorkersUIFromEmployees();
-
   } catch (err) {
     console.error(err);
     const code = err?.code || "";
@@ -1182,8 +1164,7 @@ on("btnReloadEmployees", "click", async () => {
 });
 
 async function refreshEmployees() {
-  // si no hay UI de empleados, igual actualiza cache
-  employeesCache = await fetchEmployees(500);
+  employeesCache = await fetchEmployees(1000);
   renderEmployeesTable();
   fillWorkersUIFromEmployees();
 }
@@ -1211,11 +1192,10 @@ function renderEmployeesTable() {
   }
 }
 
-/* Llena selectores de trabajador si existen en HTML */
 function fillWorkersUIFromEmployees() {
-  const active = employeesCache.filter(e => e.active !== false);
+  // Solo si tenemos empleados cargados
+  const active = (employeesCache || []).filter(e => e.active !== false);
 
-  // Asignaciones: opcional si agregas <select id="assignWorkerSelect">
   const selAssign = $("assignWorkerSelect");
   if (selAssign) {
     selAssign.innerHTML =
@@ -1223,7 +1203,6 @@ function fillWorkersUIFromEmployees() {
       active.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
   }
 
-  // Informes: si agregas <select id="reportWorkerSelect">
   const selReport = $("reportWorkerSelect");
   if (selReport) {
     selReport.innerHTML =
@@ -1233,7 +1212,7 @@ function fillWorkersUIFromEmployees() {
 }
 
 /* ---------------------------------------------------
-   Utils: rango fecha
+   Utilities
 --------------------------------------------------- */
 function withinRange(ts, fromISO, toISO) {
   const from = parseDateToTs(fromISO);
@@ -1243,11 +1222,7 @@ function withinRange(ts, fromISO, toISO) {
   return true;
 }
 
-/* ---------------------------------------------------
-   Timestamp display
---------------------------------------------------- */
 function formatTimestamp(tsObj) {
-  // Firestore Timestamp => tsObj?.toDate()
   if (!tsObj) return "";
   try {
     const d = tsObj.toDate();
@@ -1258,10 +1233,14 @@ function formatTimestamp(tsObj) {
 }
 
 /* ---------------------------------------------------
-   BOOT - estado inicial
+   BOOT
 --------------------------------------------------- */
 (function boot() {
+  // Si el JS no carga, nada funcionará.
+  // Deja un log visible en consola para confirmar carga:
+  console.log("[APA] app.js cargado OK");
+
+  setupPasswordToggles();
   showLoginOnly();
   setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
 })();
-
