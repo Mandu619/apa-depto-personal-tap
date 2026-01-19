@@ -46,6 +46,7 @@
       <section id="view-dashboard" class="view">
         <div class="card">
           <h2>Panel</h2>
+
           <div class="kpis">
             <div class="kpi"><div class="muted small">Entradas (últimos 30 días)</div><div id="kpiEntries" class="kpiVal">0</div></div>
             <div class="kpi"><div class="muted small">Asignaciones (últimos 30 días)</div><div id="kpiAssignments" class="kpiVal">0</div></div>
@@ -56,17 +57,22 @@
           <div class="grid2">
             <div>
               <h3>Últimas entradas</h3>
-              <table id="tblLastEntries" class="tbl">
-                <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th class="right">Disp.</th></tr></thead>
-                <tbody></tbody>
-              </table>
+              <div class="table-wrap">
+                <table id="tblLastEntries" class="table">
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th class="right">Disp.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
+
             <div>
               <h3>Últimas asignaciones</h3>
-              <table id="tblLastAssignments" class="tbl">
-                <thead><tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th></tr></thead>
-                <tbody></tbody>
-              </table>
+              <div class="table-wrap">
+                <table id="tblLastAssignments" class="table">
+                  <thead><tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
           </div>
 
@@ -101,8 +107,10 @@
               <div><label>Referencia / N° Doc</label><input id="entryRef" type="text" /></div>
             </div>
 
-            <button class="btn" type="submit">Guardar entrada</button>
-            <button class="btn btn--ghost" type="button" id="btnReloadEntries">Actualizar</button>
+            <div class="row row--wrap">
+              <button class="btn" type="submit">Guardar entrada</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadEntries">Actualizar</button>
+            </div>
           </form>
 
           <div id="entryMsg" class="msg info">—</div>
@@ -115,12 +123,14 @@
             <input id="filterEntryText" type="text" placeholder="Buscar texto…" />
           </div>
 
-          <table id="tblEntries" class="tbl">
-            <thead>
-              <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th class="right">Cant.</th><th class="right">Disp.</th><th>Registrado por</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrap">
+            <table id="tblEntries" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th class="right">Cant.</th><th class="right">Disp.</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -149,8 +159,10 @@
               <div><label>Motivo</label><input id="assignReason" type="text" placeholder="Ej: Entrega EPP" /></div>
             </div>
 
-            <button class="btn" type="submit">Guardar asignación</button>
-            <button class="btn btn--ghost" type="button" id="btnReloadAssignments">Actualizar</button>
+            <div class="row row--wrap">
+              <button class="btn" type="submit">Guardar asignación</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadAssignments">Actualizar</button>
+            </div>
           </form>
 
           <div id="assignMsg" class="msg info">—</div>
@@ -161,12 +173,14 @@
             <input id="filterAssignTo" type="date" />
           </div>
 
-          <table id="tblAssignments" class="tbl">
-            <thead>
-              <tr><th>Fecha</th><th>Trabajador</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Registrado por</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrap">
+            <table id="tblAssignments" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Trabajador</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -199,17 +213,21 @@
               <div><label>Detalle (si “Otro”)</label><input id="scrapDetail" type="text" /></div>
             </div>
 
-            <button class="btn" type="submit">Registrar merma</button>
+            <div class="row row--wrap">
+              <button class="btn" type="submit">Registrar merma</button>
+            </div>
           </form>
 
           <div id="scrapMsg" class="msg info">—</div>
 
-          <table id="tblScrap" class="tbl">
-            <thead>
-              <tr><th>Fecha</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrap">
+            <table id="tblScrap" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -242,8 +260,10 @@
               </div>
             </div>
 
-            <button class="btn" type="submit">Crear</button>
-            <button class="btn btn--ghost" type="button" id="btnReloadRequests">Actualizar</button>
+            <div class="row row--wrap">
+              <button class="btn" type="submit">Crear</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadRequests">Actualizar</button>
+            </div>
           </form>
 
           <div id="reqMsg" class="msg info">—</div>
@@ -257,12 +277,14 @@
             <input id="filterReqText" type="text" placeholder="Buscar…" />
           </div>
 
-          <table id="tblRequests" class="tbl">
-            <thead>
-              <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Prioridad</th><th>Estado</th><th>Respuesta</th><th>Acción</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrap">
+            <table id="tblRequests" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th>Prioridad</th><th>Estado</th><th>Respuesta</th><th>Acción</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -296,7 +318,7 @@
             </div>
           </div>
 
-          <div class="row">
+          <div class="row row--wrap">
             <button id="btnRunReport" class="btn">Generar</button>
             <button id="btnExportCSV" class="btn btn--ghost" disabled>Exportar CSV</button>
           </div>
@@ -310,12 +332,14 @@
 
           <div id="reportMsg" class="msg info">—</div>
 
-          <table id="tblReport" class="tbl">
-            <thead>
-              <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>EntryId</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+          <div class="table-wrap">
+            <table id="tblReport" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>EntryId</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </section>
 
@@ -362,7 +386,7 @@
                 </div>
               </div>
 
-              <div class="row">
+              <div class="row row--wrap">
                 <button id="btnCreateEmployee" class="btn">Crear</button>
                 <button id="btnReloadEmployees" class="btn btn--ghost" type="button">Actualizar</button>
               </div>
@@ -372,10 +396,12 @@
 
             <div class="card inner">
               <h3>Lista empleados</h3>
-              <table id="tblEmployees" class="tbl">
-                <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th></tr></thead>
-                <tbody></tbody>
-              </table>
+              <div class="table-wrap">
+                <table id="tblEmployees" class="table">
+                  <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
