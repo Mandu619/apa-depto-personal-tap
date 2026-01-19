@@ -1,6 +1,6 @@
 /******************************************************
  * APA - Sistema de Registros (TAP)
- * app.js FINAL FINAL
+ * app.js FINAL (corrige import downloadText)
  * Requiere firebase.js exportando:
  *   export const auth, db, secondaryAuth
  ******************************************************/
@@ -35,7 +35,6 @@ import {
   setMsg,
   escapeHtml,
   toCSV,
-  downloadText,
   parseDateToTs
 } from "./utils.js";
 
@@ -43,10 +42,6 @@ import {
    Helpers DOM
 --------------------------------------------------- */
 const $ = (id) => document.getElementById(id);
-
-function exists(id) {
-  return !!$(id);
-}
 
 function on(id, evt, fn) {
   const el = $(id);
@@ -71,9 +66,25 @@ function scrollTopInstant() {
 }
 
 /* ---------------------------------------------------
+   ✅ FIX: downloadText dentro de app.js
+--------------------------------------------------- */
+function downloadText(filename, text, mime = "text/plain") {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------------------------------------------
    DOM refs
 --------------------------------------------------- */
-const loginCard = $("loginCard");
 const navTabs = $("navTabs");
 const appShell = $("appShell");
 const btnLogout = $("btnLogout");
@@ -102,7 +113,7 @@ document.addEventListener("click", (e) => {
    Default dates
 --------------------------------------------------- */
 ["entryDate", "assignDate", "scrapDate"].forEach(id => {
-  if (exists(id)) $(id).value = todayISO();
+  if ($(id)) $(id).value = todayISO();
 });
 
 /* ---------------------------------------------------
@@ -137,7 +148,7 @@ function isAdmin() {
    UI state control
 --------------------------------------------------- */
 function showLoginOnly() {
-  if (loginCard) loginCard.hidden = false;
+  if ($("loginCard")) $("loginCard").hidden = false;
   if (navTabs) navTabs.hidden = true;
   if (appShell) appShell.hidden = true;
   views.forEach(v => v.hidden = true);
@@ -150,7 +161,7 @@ function showLoginOnly() {
 }
 
 function showAppShell() {
-  if (loginCard) loginCard.hidden = true;
+  if ($("loginCard")) $("loginCard").hidden = true;
   if (appShell) appShell.hidden = false;
   if (navTabs) navTabs.hidden = false;
   if (btnLogout) btnLogout.disabled = false;
@@ -161,37 +172,21 @@ function showAppShell() {
    Apply role to UI
 --------------------------------------------------- */
 function applyRoleToUI() {
-  // Forms (disable submit if cannot write)
   const writer = canWrite();
 
-  const formEntry = $("formEntry");
-  if (formEntry) {
-    const b = formEntry.querySelector("button[type=submit]");
-    if (b) b.disabled = !writer;
-  }
+  // Disable submits if cannot write
+  const entryBtn = $("formEntry")?.querySelector('button[type="submit"]');
+  if (entryBtn) entryBtn.disabled = !writer;
 
-  const formAssign = $("formAssign");
-  if (formAssign) {
-    const b = formAssign.querySelector("button[type=submit]");
-    if (b) b.disabled = !writer;
-  }
+  const assignBtn = $("formAssign")?.querySelector('button[type="submit"]');
+  if (assignBtn) assignBtn.disabled = !writer;
 
-  const formScrap = $("formScrap");
-  if (formScrap) {
-    const b = formScrap.querySelector("button[type=submit]");
-    if (b) b.disabled = !writer;
-  }
-
-  // Requests: everyone can create (no restriction)
+  const scrapBtn = $("formScrap")?.querySelector('button[type="submit"]');
+  if (scrapBtn) scrapBtn.disabled = !writer;
 
   // Employees tab only admin
   const empTabBtn = document.querySelector('[data-view="view-employees"]');
   if (empTabBtn) empTabBtn.hidden = !isAdmin();
-
-  // If not admin and currently in employees view, go dashboard
-  if (!isAdmin() && $("view-employees") && !$("view-employees").hidden) {
-    showView("view-dashboard");
-  }
 }
 
 /* ---------------------------------------------------
@@ -244,7 +239,6 @@ on("btnLogin", "click", async () => {
     return;
   }
 
-  // feedback
   setMsg(msg, "Verificando credenciales...", "info");
 
   try {
@@ -286,7 +280,6 @@ onAuthStateChanged(auth, async (u) => {
     return;
   }
 
-  // Logged
   currentUserProfile = await loadUserProfile(u.uid);
 
   if (!currentUserProfile) {
@@ -305,10 +298,8 @@ onAuthStateChanged(auth, async (u) => {
   showAppShell();
   applyRoleToUI();
 
-  // start in dashboard
   showView("view-dashboard");
 
-  // Load data
   await preloadAll();
   await refreshDashboard();
   await refreshEntries();
@@ -321,7 +312,6 @@ onAuthStateChanged(auth, async (u) => {
     await refreshEmployees();
   }
 
-  // Populate selects
   fillWorkersUIFromEmployees();
 });
 
@@ -333,12 +323,7 @@ async function preloadAll() {
   assignmentsCache = await fetchAssignments(500);
   scrapCache = await fetchScrap(500);
   requestsCache = await fetchRequests(500);
-
-  if (isAdmin()) {
-    employeesCache = await fetchEmployees(1000);
-  } else {
-    employeesCache = [];
-  }
+  employeesCache = isAdmin() ? await fetchEmployees(1000) : [];
 }
 
 /* ---------------------------------------------------
@@ -419,13 +404,12 @@ async function refreshDashboard() {
   const entries30 = entriesCache.filter(e => safeNum(e.dateTS) >= since).length;
   const assigns30 = assignmentsCache.filter(a => safeNum(a.dateTS) >= since).length;
   const scrap30 = scrapCache.filter(s => safeNum(s.dateTS) >= since).length;
-
   const pending = requestsCache.filter(r => (r.status || "Pendiente") === "Pendiente").length;
 
-  if (exists("kpiEntries")) $("kpiEntries").textContent = String(entries30);
-  if (exists("kpiAssignments")) $("kpiAssignments").textContent = String(assigns30);
-  if (exists("kpiScrap")) $("kpiScrap").textContent = String(scrap30);
-  if (exists("kpiPending")) $("kpiPending").textContent = String(pending);
+  if ($("kpiEntries")) $("kpiEntries").textContent = String(entries30);
+  if ($("kpiAssignments")) $("kpiAssignments").textContent = String(assigns30);
+  if ($("kpiScrap")) $("kpiScrap").textContent = String(scrap30);
+  if ($("kpiPending")) $("kpiPending").textContent = String(pending);
 
   renderLastEntries(entriesCache.slice(0, 6));
   renderLastAssignments(assignmentsCache.slice(0, 6));
@@ -435,12 +419,10 @@ function renderLastEntries(rows) {
   const tbody = $("tblLastEntries")?.querySelector("tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="muted">Sin datos</td></tr>`;
     return;
   }
-
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -458,12 +440,10 @@ function renderLastAssignments(rows) {
   const tbody = $("tblLastAssignments")?.querySelector("tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-
   if (!rows.length) {
     tbody.innerHTML = `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
     return;
   }
-
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -477,7 +457,7 @@ function renderLastAssignments(rows) {
 }
 
 /* ---------------------------------------------------
-   ENTRIES
+   ENTRADAS
 --------------------------------------------------- */
 on("formEntry", "submit", async (e) => {
   e.preventDefault();
@@ -516,7 +496,7 @@ on("formEntry", "submit", async (e) => {
 
     setMsg(msg, "✅ Entrada registrada correctamente.", "ok");
     e.target.reset();
-    if (exists("entryDate")) $("entryDate").value = todayISO();
+    if ($("entryDate")) $("entryDate").value = todayISO();
 
     entriesCache = await fetchEntries(500);
     await refreshEntries();
@@ -570,7 +550,6 @@ async function refreshEntries() {
   }
 }
 
-/* Dropdowns */
 async function refreshEntryDropdowns() {
   const list = entriesCache.slice().sort((a, b) => safeNum(b.dateTS) - safeNum(a.dateTS));
   const assignsSel = $("assignEntryId");
@@ -651,7 +630,7 @@ on("formAssign", "submit", async (e) => {
 
     setMsg(msg, "✅ Asignación registrada.", "ok");
     e.target.reset();
-    if (exists("assignDate")) $("assignDate").value = todayISO();
+    if ($("assignDate")) $("assignDate").value = todayISO();
 
     entriesCache = await fetchEntries(500);
     assignmentsCache = await fetchAssignments(500);
@@ -772,7 +751,7 @@ on("formScrap", "submit", async (e) => {
 
     setMsg(msg, "✅ Merma registrada.", "ok");
     e.target.reset();
-    if (exists("scrapDate")) $("scrapDate").value = todayISO();
+    if ($("scrapDate")) $("scrapDate").value = todayISO();
 
     entriesCache = await fetchEntries(500);
     scrapCache = await fetchScrap(500);
@@ -1039,10 +1018,10 @@ async function runReport() {
   const totalScrap = rows.filter(r => r.TipoMov === "Merma").reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
   const totalRemaining = entriesCache.reduce((acc, e) => acc + safeNum(e.available), 0);
 
-  if (exists("reportCount")) $("reportCount").textContent = String(totalCount);
-  if (exists("reportQty")) $("reportQty").textContent = String(totalQty);
-  if (exists("reportScrapTotal")) $("reportScrapTotal").textContent = String(totalScrap);
-  if (exists("reportRemainingTotal")) $("reportRemainingTotal").textContent = String(totalRemaining);
+  if ($("reportCount")) $("reportCount").textContent = String(totalCount);
+  if ($("reportQty")) $("reportQty").textContent = String(totalQty);
+  if ($("reportScrapTotal")) $("reportScrapTotal").textContent = String(totalScrap);
+  if ($("reportRemainingTotal")) $("reportRemainingTotal").textContent = String(totalRemaining);
 
   const btnCSV = $("btnExportCSV");
   if (btnCSV) btnCSV.disabled = rows.length === 0;
@@ -1104,9 +1083,7 @@ on("btnCreateEmployee", "click", async () => {
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
 
-    try {
-      await updateProfile(cred.user, { displayName: `${first} ${last}` });
-    } catch {}
+    try { await updateProfile(cred.user, { displayName: `${first} ${last}` }); } catch {}
 
     const uid = cred.user.uid;
     const fullName = `${first} ${last}`;
@@ -1135,13 +1112,12 @@ on("btnCreateEmployee", "click", async () => {
       active
     });
 
-    // Clear
-    if (exists("empFirst")) $("empFirst").value = "";
-    if (exists("empLast")) $("empLast").value = "";
-    if (exists("empEmail")) $("empEmail").value = "";
-    if (exists("empPass")) $("empPass").value = "";
-    if (exists("empRole")) $("empRole").value = "consulta";
-    if (exists("empActive")) $("empActive").value = "true";
+    $("empFirst").value = "";
+    $("empLast").value = "";
+    $("empEmail").value = "";
+    $("empPass").value = "";
+    $("empRole").value = "consulta";
+    $("empActive").value = "true";
 
     setMsg(msg, "✅ Empleado creado. Ya puede iniciar sesión.", "ok");
 
@@ -1193,7 +1169,6 @@ function renderEmployeesTable() {
 }
 
 function fillWorkersUIFromEmployees() {
-  // Solo si tenemos empleados cargados
   const active = (employeesCache || []).filter(e => e.active !== false);
 
   const selAssign = $("assignWorkerSelect");
@@ -1212,7 +1187,7 @@ function fillWorkersUIFromEmployees() {
 }
 
 /* ---------------------------------------------------
-   Utilities
+   Utils
 --------------------------------------------------- */
 function withinRange(ts, fromISO, toISO) {
   const from = parseDateToTs(fromISO);
@@ -1236,11 +1211,9 @@ function formatTimestamp(tsObj) {
    BOOT
 --------------------------------------------------- */
 (function boot() {
-  // Si el JS no carga, nada funcionará.
-  // Deja un log visible en consola para confirmar carga:
   console.log("[APA] app.js cargado OK");
-
   setupPasswordToggles();
   showLoginOnly();
   setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
 })();
+
