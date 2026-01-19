@@ -397,13 +397,23 @@ on("btnLogin", "click", async () => {
   }
 });
 
-on("btnLogout", "click", async () => {
-  try {
-    await signOut(auth);
-  } catch (e) {
-    console.error(e);
-  }
-});
+// Logout (Salir) -> cierra sesión y vuelve al login
+const btnLogout = document.getElementById("btnLogout");
+if (btnLogout) {
+  btnLogout.addEventListener("click", async () => {
+    try {
+      const { auth } = await import("./firebase.js");
+      const { signOut } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js");
+      await signOut(auth);
+    } catch (e) {
+      console.warn("Logout warning:", e);
+    } finally {
+      // vuelve al login sí o sí
+      window.location.replace("./index.html");
+    }
+  });
+}
+
 
 /* =====================================================
    AUTH STATE
@@ -1310,5 +1320,6 @@ function fillWorkersUIFromEmployees() {
   // Asegurar que reqType tenga "Solicitud" al cargar
   ensureRequestTypeHasSolicitud();
 })();
+
 
 
