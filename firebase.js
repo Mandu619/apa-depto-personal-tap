@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/fireba
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-export const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyBOOELFBd07Iy3vF3SUkgZQD6eG5Td5ZaU",
   authDomain: "apa-depto-personal-tap.firebaseapp.com",
   projectId: "apa-depto-personal-tap",
@@ -11,6 +11,10 @@ export const firebaseConfig = {
   appId: "1:826908597018:web:5ac643714839cfe06d6aa3"
 };
 
-export const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Secondary app/auth: permite crear usuarios sin cerrar la sesión del admin
+const secondaryApp = initializeApp(firebaseConfig, "secondary");
+export const secondaryAuth = getAuth(secondaryApp);
