@@ -27,36 +27,41 @@
   </header>
 
   <main class="container">
+    <!-- LOGIN (solo esto debe verse antes de iniciar sesión) -->
+    <section class="login-wrap" id="loginWrap">
+      <section class="card login-card" id="loginCard">
+        <h2>Ingreso al sistema</h2>
+        <p class="muted">Acceso exclusivo para personal autorizado del Depto. Personal (APA).</p>
 
-    <!-- LOGIN (lo único visible antes de loguear) -->
-    <section class="card login-card" id="loginCard">
-      <h2>Ingreso al sistema</h2>
-      <p class="muted">Acceso restringido. Usa tu cuenta institucional creada en Firebase Authentication.</p>
+        <div class="grid2">
+          <div>
+            <label for="loginEmail">Correo</label>
+            <input id="loginEmail" type="email" placeholder="usuario@correo.com" autocomplete="username" />
+          </div>
 
-      <div class="grid2">
-        <div>
-          <label for="loginEmail">Correo</label>
-          <input id="loginEmail" type="email" placeholder="usuario@correo.com" autocomplete="username" />
-        </div>
-
-        <div>
-          <label for="loginPassword">Contraseña</label>
-          <div class="password-wrap">
-            <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
-            <button id="btnTogglePassword" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">👁️</button>
+          <div>
+            <label for="loginPassword">Contraseña</label>
+            <div class="password-wrap">
+              <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+              <button id="btnTogglePassword" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">👁️</button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div class="row">
-        <button class="btn btn--primary" id="btnLogin" type="button">Ingresar</button>
-        <span class="muted small">Si dudas del correo, revisa Firebase → Authentication → Users</span>
-      </div>
+        <div class="row">
+          <button class="btn btn--primary" id="btnLogin" type="button">Ingresar</button>
+          <span class="muted small">Si dudas del usuario, revisa Firebase → Authentication → Users</span>
+        </div>
 
-      <div id="loginMsg" class="msg" aria-live="polite"></div>
+        <div id="loginMsg" class="msg" aria-live="polite"></div>
+
+        <div class="login-foot muted small">
+          Soporte interno: Suboficial Rodrigo Arancibia • Maritza Aguila • Camila Catalán • Cabo Alonso Parraguez
+        </div>
+      </section>
     </section>
 
-    <!-- APP (solo visible DESPUÉS de login) -->
+    <!-- APP (NO debe verse antes de login) -->
     <section class="app" id="appShell" hidden>
       <nav class="nav">
         <button class="tab is-active" data-tab="tabDashboard">Panel</button>
@@ -65,7 +70,7 @@
         <button class="tab" data-tab="tabScrap">Merma</button>
         <button class="tab" data-tab="tabRequests">Solicitudes</button>
         <button class="tab" data-tab="tabReports">Informes</button>
-        <button class="tab admin-only" data-tab="tabEmployees" hidden>Empleados</button>
+        <button class="tab" data-tab="tabEmployees" id="tabEmployeesBtn" hidden>Empleados</button>
       </nav>
 
       <!-- DASHBOARD -->
@@ -220,7 +225,7 @@
       <!-- ASIGNACIONES -->
       <section class="card tabpage" id="tabAssignments" hidden>
         <h2>Asignación a trabajador</h2>
-        <p class="muted">Asigna un ítem a un trabajador registrado. Descuenta stock disponible.</p>
+        <p class="muted">Asigna un ítem a un trabajador. Descuenta stock disponible.</p>
 
         <div class="panel">
           <h3>Nueva asignación</h3>
@@ -236,9 +241,9 @@
             </div>
 
             <div>
-              <label for="asWorker">Trabajador</label>
-              <select id="asWorker"></select>
-              <div class="muted small">Se carga desde Firestore → employees</div>
+              <label for="asWorkerSelect">Trabajador (desde base)</label>
+              <select id="asWorkerSelect"></select>
+              <div class="muted small">Si no aparece, créalo en “Empleados” (solo admin).</div>
             </div>
 
             <div>
@@ -437,16 +442,27 @@
       <!-- INFORMES -->
       <section class="card tabpage" id="tabReports" hidden>
         <h2>Informes</h2>
-        <p class="muted">Reportes por trabajador y resumen global (Entradas, Asignaciones, Mermas, Stock restante).</p>
+        <p class="muted">
+          Informes por trabajador / tipo, incluye mermas y resumen de stock total restante.
+        </p>
 
         <div class="panel">
           <h3>Parámetros</h3>
 
           <div class="grid2">
             <div>
-              <label for="rpWorker">Trabajador</label>
-              <select id="rpWorker"></select>
-              <div class="muted small">Se carga desde Firestore → employees</div>
+              <label for="rpMode">Modo</label>
+              <select id="rpMode">
+                <option value="worker">Por trabajador (asignaciones)</option>
+                <option value="type">Por tipo (entradas/asignaciones/mermas)</option>
+                <option value="stock">Resumen de stock total (entradas - asignaciones - mermas)</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="rpWorkerSelect">Trabajador (desde base)</label>
+              <select id="rpWorkerSelect"></select>
+              <div class="muted small">Se carga desde colección <b>employees</b>.</div>
             </div>
 
             <div>
@@ -457,14 +473,6 @@
               <label for="rpTo">Hasta (opcional)</label>
               <input id="rpTo" type="date" />
             </div>
-
-            <div>
-              <label for="rpMode">Vista</label>
-              <select id="rpMode">
-                <option value="worker">Por trabajador (detalle + resumen)</option>
-                <option value="global">Resumen global (stock)</option>
-              </select>
-            </div>
           </div>
 
           <div class="row">
@@ -473,28 +481,6 @@
           </div>
 
           <div class="msg" id="rpMsg"></div>
-        </div>
-
-        <div class="panel">
-          <h3>Resumen</h3>
-          <div class="kpis kpis-4">
-            <div class="kpi">
-              <div class="kpi-label">Total entradas</div>
-              <div class="kpi-value" id="rpKpiIn">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Total asignaciones</div>
-              <div class="kpi-value" id="rpKpiAs">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Total mermas</div>
-              <div class="kpi-value" id="rpKpiSc">—</div>
-            </div>
-            <div class="kpi">
-              <div class="kpi-label">Stock restante total</div>
-              <div class="kpi-value" id="rpKpiRemain">—</div>
-            </div>
-          </div>
         </div>
 
         <div class="panel">
@@ -510,16 +496,18 @@
               <tbody></tbody>
             </table>
           </div>
+
+          <div class="msg" id="rpSummaryMsg"></div>
         </div>
       </section>
 
       <!-- EMPLEADOS (solo admin) -->
       <section class="card tabpage" id="tabEmployees" hidden>
-        <h2>Gestión de empleados (Admin)</h2>
-        <p class="muted">Crea usuarios para el sistema y asigna roles de acceso (admin / operator / consulta).</p>
+        <h2>Empleados</h2>
+        <p class="muted">Solo Admin: crea empleados (Auth + Firestore) y asigna rol de acceso.</p>
 
         <div class="panel">
-          <h3>Crear nuevo empleado</h3>
+          <h3>Crear empleado</h3>
 
           <div class="grid2">
             <div>
@@ -533,11 +521,15 @@
 
             <div>
               <label for="empEmail">Correo</label>
-              <input id="empEmail" type="email" placeholder="empleado@correo.com" />
+              <input id="empEmail" type="email" placeholder="correo@dominio.com" />
             </div>
             <div>
-              <label for="empPass">Clave</label>
-              <input id="empPass" type="password" placeholder="Mínimo 6 caracteres" />
+              <label for="empPass">Clave temporal</label>
+              <div class="password-wrap">
+                <input id="empPass" type="password" placeholder="Mínimo 6 caracteres" />
+                <button id="btnToggleEmpPass" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">👁️</button>
+              </div>
+              <div class="muted small">La clave NO se guarda en Firestore. Solo se usa para crear el usuario.</div>
             </div>
 
             <div>
@@ -548,13 +540,18 @@
                 <option value="admin">admin</option>
               </select>
             </div>
-
-            <div class="span2">
-              <div class="row">
-                <button class="btn btn--primary" id="btnCreateEmployee" type="button">Crear empleado</button>
-                <span class="muted small">Se crea en Authentication + Firestore (users y employees)</span>
-              </div>
+            <div>
+              <label for="empActive">Estado</label>
+              <select id="empActive">
+                <option value="true">Activo</option>
+                <option value="false">Inactivo</option>
+              </select>
             </div>
+          </div>
+
+          <div class="row">
+            <button class="btn btn--primary" id="btnCreateEmployee" type="button">Crear empleado</button>
+            <span class="muted small">Se crea en Auth y se registra en Firestore (employees + users).</span>
           </div>
 
           <div class="msg" id="empMsg"></div>
@@ -562,7 +559,6 @@
 
         <div class="panel">
           <h3>Listado de empleados</h3>
-
           <div class="row row--wrap">
             <button class="btn btn--ghost" id="btnReloadEmployees" type="button">Actualizar</button>
           </div>
@@ -574,6 +570,7 @@
                   <th>Nombre</th>
                   <th>Correo</th>
                   <th>Rol</th>
+                  <th>Activo</th>
                 </tr>
               </thead>
               <tbody></tbody>
