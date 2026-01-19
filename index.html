@@ -48,9 +48,14 @@
           <input id="loginEmail" type="email" placeholder="usuario@dominio.cl" />
         </div>
         <div>
-          <label>Contraseña</label>
-          <input id="loginPassword" type="password" placeholder="••••••••" />
-        </div>
+  <label>Contraseña</label>
+
+  <div class="password-wrap">
+    <input id="loginPassword" type="password" placeholder="••••••••" />
+    <button id="btnTogglePassword" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">
+      👁️
+    </button>
+  </div>
       </div>
       <div class="actions">
         <button id="btnLogin" class="btn">Ingresar</button>
@@ -487,3 +492,4 @@
   <script type="module" src="app.js"></script>
 </body>
 </html>
+
