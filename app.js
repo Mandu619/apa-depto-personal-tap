@@ -1,15 +1,11 @@
 /******************************************************
  * APA - Sistema de Registros (TAP)
- * app.js FINAL DEFINITIVO
- * - NO depende de utils.js (evita errores de exports)
- * - Login profesional + toggles password
- * - Admin crea empleados (Auth + Firestore)
- * - Selectores trabajadores en Asignación e Informes
- * - Informes incluyen merma + stock restante total
- * - Solicitudes incluye tipo "Solicitud"
+ * app.js FINAL COMPLETO (sin utils.js)
  *
- * Requiere firebase.js exportando:
- *   export const auth, db, secondaryAuth
+ * Requisitos:
+ * - firebase.js debe exportar: auth, db, secondaryAuth
+ * - Firestore collections:
+ *   entries, assignments, scrap, requests, employees, users
  ******************************************************/
 
 import { auth, db, secondaryAuth } from "./firebase.js";
@@ -37,9 +33,9 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-/* ---------------------------------------------------
-   ✅ Utils internos (sin utils.js)
---------------------------------------------------- */
+/* =====================================================
+   Utils internos (no depende de utils.js)
+===================================================== */
 const $ = (id) => document.getElementById(id);
 const qsa = (sel) => Array.from(document.querySelectorAll(sel));
 
@@ -48,9 +44,9 @@ function on(id, evt, fn) {
   if (el) el.addEventListener(evt, fn);
 }
 
-function safeNum(v, def = 0) {
+function safeNum(v, defVal = 0) {
   const n = Number(v);
-  return Number.isFinite(n) ? n : def;
+  return Number.isFinite(n) ? n : defVal;
 }
 
 function todayISO() {
@@ -68,54 +64,20 @@ function parseDateToTs(iso) {
 }
 
 function escapeHtml(str) {
-  const s = String(str ?? "");
+  const s = String(str == null ? "" : str);
   return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
-function setMsg(el, text, kind = "") {
+function setMsg(el, text, kind) {
   if (!el) return;
   el.textContent = text || "";
   el.className = "msg";
   if (kind) el.classList.add(kind);
-}
-
-function toCSV(rows, headers) {
-  const esc = (v) => {
-    const s = String(v ?? "");
-    if (s.includes('"') || s.includes(",") || s.includes("\n")) {
-      return `"${s.replaceAll('"', '""')}"`;
-    }
-    return s;
-  };
-
-  const head = headers.join(",");
-  const body = rows.map(r => headers.map(h => esc(r[h])).join(",")).join("\n");
-  return `${head}\n${body}`;
-}
-
-function downloadText(filename, text, mime = "text/plain") {
-  const blob = new Blob([text], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function withinRange(ts, fromISO, toISO) {
-  const from = parseDateToTs(fromISO);
-  const to = parseDateToTs(toISO);
-  if (from && ts < from) return false;
-  if (to && ts > (to + 24 * 60 * 60 * 1000 - 1)) return false;
-  return true;
 }
 
 function formatTimestamp(tsObj) {
@@ -128,14 +90,54 @@ function formatTimestamp(tsObj) {
   }
 }
 
-function scrollTopInstant() {
-  try { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }
-  catch { window.scrollTo(0, 0); }
+function withinRange(ts, fromISO, toISO) {
+  const from = parseDateToTs(fromISO);
+  const to = parseDateToTs(toISO);
+  if (from && ts < from) return false;
+  if (to && ts > (to + 24 * 60 * 60 * 1000 - 1)) return false;
+  return true;
 }
 
-/* ---------------------------------------------------
-   DOM refs
---------------------------------------------------- */
+function scrollTopInstant() {
+  try {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  } catch {
+    window.scrollTo(0, 0);
+  }
+}
+
+function toCSV(rows, headers) {
+  function esc(v) {
+    const s = String(v == null ? "" : v);
+    if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+    return s;
+  }
+
+  const head = headers.join(",");
+  const body = rows
+    .map((r) => headers.map((h) => esc(r[h])).join(","))
+    .join("\n");
+  return `${head}\n${body}`;
+}
+
+function downloadText(filename, text, mime) {
+  const m = mime || "text/plain";
+  const blob = new Blob([text], { type: m });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* =====================================================
+   DOM principales
+===================================================== */
 const navTabs = $("navTabs");
 const appShell = $("appShell");
 const btnLogout = $("btnLogout");
@@ -143,33 +145,9 @@ const userName = $("userName");
 const userRole = $("userRole");
 const views = qsa(".view");
 
-/* ---------------------------------------------------
-   View switching
---------------------------------------------------- */
-function showView(viewId) {
-  views.forEach(v => v.hidden = (v.id !== viewId));
-  qsa(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === viewId));
-  scrollTopInstant();
-}
-
-document.addEventListener("click", (e) => {
-  const tab = e.target.closest(".tab");
-  if (!tab) return;
-  const viewId = tab.dataset.view;
-  if (!viewId) return;
-  showView(viewId);
-});
-
-/* ---------------------------------------------------
-   Default dates
---------------------------------------------------- */
-["entryDate", "assignDate", "scrapDate"].forEach(id => {
-  if ($(id)) $(id).value = todayISO();
-});
-
-/* ---------------------------------------------------
-   Session + caches
---------------------------------------------------- */
+/* =====================================================
+   Estado de sesión + cachés
+===================================================== */
 let currentUser = null;
 let currentUserProfile = null;
 
@@ -181,11 +159,11 @@ let employeesCache = [];
 
 let reportRows = [];
 
-/* ---------------------------------------------------
+/* =====================================================
    Roles
---------------------------------------------------- */
+===================================================== */
 function role() {
-  return currentUserProfile?.role || "consulta";
+  return (currentUserProfile && currentUserProfile.role) ? currentUserProfile.role : "consulta";
 }
 function canWrite() {
   const r = role();
@@ -195,14 +173,17 @@ function isAdmin() {
   return role() === "admin";
 }
 
-/* ---------------------------------------------------
-   UI state control
---------------------------------------------------- */
+/* =====================================================
+   UI: mostrar/ocultar
+===================================================== */
 function showLoginOnly() {
-  if ($("loginWrap")) $("loginWrap").hidden = false;
+  const loginWrap = $("loginWrap");
+  if (loginWrap) loginWrap.hidden = false;
+
   if (navTabs) navTabs.hidden = true;
   if (appShell) appShell.hidden = true;
-  views.forEach(v => v.hidden = true);
+
+  views.forEach((v) => (v.hidden = true));
 
   if (btnLogout) btnLogout.disabled = true;
   if (userName) userName.textContent = "No autenticado";
@@ -211,42 +192,63 @@ function showLoginOnly() {
   scrollTopInstant();
 }
 
-function showAppShell() {
-  if ($("loginWrap")) $("loginWrap").hidden = true;
-  if (appShell) appShell.hidden = false;
+function showAppOnly() {
+  const loginWrap = $("loginWrap");
+  if (loginWrap) loginWrap.hidden = true;
+
   if (navTabs) navTabs.hidden = false;
+  if (appShell) appShell.hidden = false;
+
   if (btnLogout) btnLogout.disabled = false;
+
   scrollTopInstant();
 }
 
-/* ---------------------------------------------------
-   Apply role to UI
---------------------------------------------------- */
+/* =====================================================
+   Tabs / Views
+===================================================== */
+function showView(viewId) {
+  views.forEach((v) => (v.hidden = v.id !== viewId));
+  qsa(".tab").forEach((t) => t.classList.toggle("active", t.dataset.view === viewId));
+  scrollTopInstant();
+}
+
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  const viewId = tab.dataset.view;
+  if (!viewId) return;
+  showView(viewId);
+});
+
+/* =====================================================
+   Aplicar permisos a UI
+===================================================== */
 function applyRoleToUI() {
   const writer = canWrite();
 
-  const entryBtn = $("formEntry")?.querySelector('button[type="submit"]');
+  const entryBtn = $("formEntry") ? $("formEntry").querySelector('button[type="submit"]') : null;
   if (entryBtn) entryBtn.disabled = !writer;
 
-  const assignBtn = $("formAssign")?.querySelector('button[type="submit"]');
+  const assignBtn = $("formAssign") ? $("formAssign").querySelector('button[type="submit"]') : null;
   if (assignBtn) assignBtn.disabled = !writer;
 
-  const scrapBtn = $("formScrap")?.querySelector('button[type="submit"]');
+  const scrapBtn = $("formScrap") ? $("formScrap").querySelector('button[type="submit"]') : null;
   if (scrapBtn) scrapBtn.disabled = !writer;
 
-  const empTabBtn = document.querySelector('[data-view="view-employees"]');
-  if (empTabBtn) empTabBtn.hidden = !isAdmin();
+  // Mostrar tab empleados solo admin
+  const empTab = document.querySelector('[data-view="view-employees"]');
+  if (empTab) empTab.hidden = !isAdmin();
 }
 
-/* ---------------------------------------------------
+/* =====================================================
    Password toggles
---------------------------------------------------- */
+===================================================== */
 function setupPasswordToggles() {
   on("btnTogglePassword", "click", () => {
     const input = $("loginPassword");
     const btn = $("btnTogglePassword");
     if (!input || !btn) return;
-
     const isPwd = input.type === "password";
     input.type = isPwd ? "text" : "password";
     btn.textContent = isPwd ? "🙈" : "👁️";
@@ -256,31 +258,117 @@ function setupPasswordToggles() {
     const input = $("empPass");
     const btn = $("btnToggleEmpPass");
     if (!input || !btn) return;
-
     const isPwd = input.type === "password";
     input.type = isPwd ? "text" : "password";
     btn.textContent = isPwd ? "🙈" : "👁️";
   });
 }
 
-/* ---------------------------------------------------
-   Profile /users/{uid}
---------------------------------------------------- */
-async function loadUserProfile(uid) {
-  const ref = doc(db, "users", uid);
-  const snap = await getDoc(ref);
-  return snap.exists() ? snap.data() : null;
+/* =====================================================
+   Firestore: fetch
+===================================================== */
+async function fetchEntries(n) {
+  const max = n || 500;
+  try {
+    const qRef = query(collection(db, "entries"), orderBy("dateTS", "desc"), limit(max));
+    const snap = await getDocs(qRef);
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (e) {
+    console.error("fetchEntries", e);
+    return [];
+  }
 }
 
-/* ---------------------------------------------------
-   AUTH
---------------------------------------------------- */
+async function fetchAssignments(n) {
+  const max = n || 500;
+  try {
+    const qRef = query(collection(db, "assignments"), orderBy("dateTS", "desc"), limit(max));
+    const snap = await getDocs(qRef);
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (e) {
+    console.error("fetchAssignments", e);
+    return [];
+  }
+}
+
+async function fetchScrap(n) {
+  const max = n || 500;
+  try {
+    const qRef = query(collection(db, "scrap"), orderBy("dateTS", "desc"), limit(max));
+    const snap = await getDocs(qRef);
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (e) {
+    console.error("fetchScrap", e);
+    return [];
+  }
+}
+
+async function fetchRequests(n) {
+  const max = n || 500;
+  try {
+    const qRef = query(collection(db, "requests"), orderBy("createdAt", "desc"), limit(max));
+    const snap = await getDocs(qRef);
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (e) {
+    console.error("fetchRequests", e);
+    return [];
+  }
+}
+
+async function fetchEmployees(n) {
+  const max = n || 1000;
+  try {
+    const qRef = query(collection(db, "employees"), orderBy("name", "asc"), limit(max));
+    const snap = await getDocs(qRef);
+    const rows = [];
+    snap.forEach((d) => rows.push({ id: d.id, ...d.data() }));
+    return rows;
+  } catch (e) {
+    console.error("fetchEmployees", e);
+    return [];
+  }
+}
+
+async function preloadAll() {
+  entriesCache = await fetchEntries(800);
+  assignmentsCache = await fetchAssignments(800);
+  scrapCache = await fetchScrap(800);
+  requestsCache = await fetchRequests(800);
+  employeesCache = isAdmin() ? await fetchEmployees(1200) : [];
+}
+
+/* =====================================================
+   Perfil usuario: users/{uid}
+===================================================== */
+async function loadUserProfile(uid) {
+  try {
+    const ref = doc(db, "users", uid);
+    const snap = await getDoc(ref);
+    return snap.exists() ? snap.data() : null;
+  } catch (e) {
+    console.error("loadUserProfile", e);
+    return null;
+  }
+}
+
+/* =====================================================
+   LOGIN / LOGOUT
+===================================================== */
 on("btnLogin", "click", async () => {
-  const email = ($("loginEmail")?.value || "").trim();
-  const password = $("loginPassword")?.value || "";
+  const email = ($("loginEmail") ? $("loginEmail").value : "").trim();
+  const password = $("loginPassword") ? $("loginPassword").value : "";
   const msg = $("loginMsg");
 
   setMsg(msg, "");
+
   if (!email || !password) {
     setMsg(msg, "Debes ingresar correo y contraseña.", "warn");
     return;
@@ -293,26 +381,33 @@ on("btnLogin", "click", async () => {
     setMsg(msg, "✅ Ingreso exitoso. Cargando...", "ok");
   } catch (err) {
     console.error(err);
-    const code = err?.code || "";
+    const code = err && err.code ? err.code : "";
 
-    if (code.includes("auth/invalid-credential") || code.includes("auth/wrong-password")) {
+    if (code.indexOf("auth/invalid-credential") >= 0 || code.indexOf("auth/wrong-password") >= 0) {
       setMsg(msg, "❌ Correo o contraseña incorrectos.", "bad");
-    } else if (code.includes("auth/user-not-found")) {
+    } else if (code.indexOf("auth/user-not-found") >= 0) {
       setMsg(msg, "❌ No existe un usuario con ese correo.", "bad");
-    } else if (code.includes("auth/unauthorized-domain")) {
+    } else if (code.indexOf("auth/unauthorized-domain") >= 0) {
       setMsg(msg, "❌ Dominio no autorizado. Agrega 'mandu619.github.io' en Firebase Auth → Authorized domains.", "bad");
-    } else if (code.includes("auth/too-many-requests")) {
+    } else if (code.indexOf("auth/too-many-requests") >= 0) {
       setMsg(msg, "⚠️ Demasiados intentos. Espera un momento y prueba otra vez.", "warn");
     } else {
-      setMsg(msg, `❌ Error al ingresar (${code || "desconocido"}).`, "bad");
+      setMsg(msg, "❌ Error al ingresar. Revisa consola y configuración Firebase.", "bad");
     }
   }
 });
 
 on("btnLogout", "click", async () => {
-  try { await signOut(auth); } catch (e) { console.error(e); }
+  try {
+    await signOut(auth);
+  } catch (e) {
+    console.error(e);
+  }
 });
 
+/* =====================================================
+   AUTH STATE
+===================================================== */
 onAuthStateChanged(auth, async (u) => {
   currentUser = u;
 
@@ -329,7 +424,7 @@ onAuthStateChanged(auth, async (u) => {
     showLoginOnly();
     setMsg(
       $("loginMsg"),
-      "⚠️ Usuario existe en Authentication, pero falta perfil en Firestore: users/{uid}. Pide al admin crearlo.",
+      "⚠️ Usuario existe en Authentication, pero falta su perfil en Firestore: users/{uid}. (Debe crearlo el admin).",
       "warn"
     );
     return;
@@ -338,15 +433,16 @@ onAuthStateChanged(auth, async (u) => {
   if (userName) userName.textContent = currentUserProfile.name || u.email || "Usuario";
   if (userRole) userRole.textContent = `Rol: ${currentUserProfile.role || "—"}`;
 
-  showAppShell();
+  showAppOnly();
   applyRoleToUI();
 
-  showView("view-dashboard");
-
+  // Cargar todo y luego refrescar pantallas
   await preloadAll();
+  fillWorkersUIFromEmployees();
+  await refreshEntryDropdowns();
+
   await refreshDashboard();
   await refreshEntries();
-  await refreshEntryDropdowns();
   await refreshAssignments();
   await refreshScrap();
   await refreshRequests();
@@ -355,96 +451,19 @@ onAuthStateChanged(auth, async (u) => {
     await refreshEmployees();
   }
 
-  fillWorkersUIFromEmployees();
+  showView("view-dashboard");
 });
 
-/* ---------------------------------------------------
-   Fetch
---------------------------------------------------- */
-async function fetchEntries(n = 200) {
-  try {
-    const qRef = query(collection(db, "entries"), orderBy("dateTS", "desc"), limit(n));
-    const snap = await getDocs(qRef);
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    return rows;
-  } catch (e) {
-    console.error("fetchEntries", e);
-    return [];
-  }
-}
-
-async function fetchAssignments(n = 200) {
-  try {
-    const qRef = query(collection(db, "assignments"), orderBy("dateTS", "desc"), limit(n));
-    const snap = await getDocs(qRef);
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    return rows;
-  } catch (e) {
-    console.error("fetchAssignments", e);
-    return [];
-  }
-}
-
-async function fetchScrap(n = 200) {
-  try {
-    const qRef = query(collection(db, "scrap"), orderBy("dateTS", "desc"), limit(n));
-    const snap = await getDocs(qRef);
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    return rows;
-  } catch (e) {
-    console.error("fetchScrap", e);
-    return [];
-  }
-}
-
-async function fetchRequests(n = 200) {
-  try {
-    const qRef = query(collection(db, "requests"), orderBy("createdAt", "desc"), limit(n));
-    const snap = await getDocs(qRef);
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    return rows;
-  } catch (e) {
-    console.error("fetchRequests", e);
-    return [];
-  }
-}
-
-async function fetchEmployees(n = 200) {
-  try {
-    const qRef = query(collection(db, "employees"), orderBy("name", "asc"), limit(n));
-    const snap = await getDocs(qRef);
-    const rows = [];
-    snap.forEach(d => rows.push({ id: d.id, ...d.data() }));
-    return rows;
-  } catch (e) {
-    console.error("fetchEmployees", e);
-    return [];
-  }
-}
-
-async function preloadAll() {
-  entriesCache = await fetchEntries(500);
-  assignmentsCache = await fetchAssignments(500);
-  scrapCache = await fetchScrap(500);
-  requestsCache = await fetchRequests(500);
-  employeesCache = isAdmin() ? await fetchEmployees(1000) : [];
-}
-
-/* ---------------------------------------------------
+/* =====================================================
    DASHBOARD
---------------------------------------------------- */
+===================================================== */
 async function refreshDashboard() {
-  const now = Date.now();
-  const since = now - 30 * 24 * 60 * 60 * 1000;
+  const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-  const entries30 = entriesCache.filter(e => safeNum(e.dateTS) >= since).length;
-  const assigns30 = assignmentsCache.filter(a => safeNum(a.dateTS) >= since).length;
-  const scrap30 = scrapCache.filter(s => safeNum(s.dateTS) >= since).length;
-  const pending = requestsCache.filter(r => (r.status || "Pendiente") === "Pendiente").length;
+  const entries30 = entriesCache.filter((e) => safeNum(e.dateTS) >= since).length;
+  const assigns30 = assignmentsCache.filter((a) => safeNum(a.dateTS) >= since).length;
+  const scrap30 = scrapCache.filter((s) => safeNum(s.dateTS) >= since).length;
+  const pending = requestsCache.filter((r) => (r.status || "Pendiente") === "Pendiente").length;
 
   if ($("kpiEntries")) $("kpiEntries").textContent = String(entries30);
   if ($("kpiAssignments")) $("kpiAssignments").textContent = String(assigns30);
@@ -453,52 +472,57 @@ async function refreshDashboard() {
 
   renderLastEntries(entriesCache.slice(0, 6));
   renderLastAssignments(assignmentsCache.slice(0, 6));
+
+  const dashMsg = $("dashMsg");
+  if (dashMsg) setMsg(dashMsg, "Panel actualizado.", "ok");
 }
 
 function renderLastEntries(rows) {
-  const tbody = $("tblLastEntries")?.querySelector("tbody");
+  const tbody = $("tblLastEntries") ? $("tblLastEntries").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
+
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5" class="muted">Sin datos</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="5" class="muted">Sin datos</td></tr>';
     return;
   }
-  for (const r of rows) {
+
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.dateISO || "")}</td>
-      <td>${escapeHtml(r.type || "")}</td>
-      <td>${escapeHtml(r.desc || "")}</td>
-      <td class="right">${escapeHtml(String(r.qty ?? ""))}</td>
-      <td class="right">${escapeHtml(String(r.available ?? ""))}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
+      "<td>" + escapeHtml(r.type || "") + "</td>" +
+      "<td>" + escapeHtml(r.desc || "") + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.available || 0)) + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
 function renderLastAssignments(rows) {
-  const tbody = $("tblLastAssignments")?.querySelector("tbody");
+  const tbody = $("tblLastAssignments") ? $("tblLastAssignments").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
+
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="4" class="muted">Sin datos</td></tr>';
     return;
   }
-  for (const r of rows) {
+
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.dateISO || "")}</td>
-      <td>${escapeHtml(r.worker || "")}</td>
-      <td>${escapeHtml(r.entryLabel || r.entryDesc || "")}</td>
-      <td class="right">${escapeHtml(String(r.qty ?? ""))}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
+      "<td>" + escapeHtml(r.worker || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryLabel || r.entryDesc || "") + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
-/* ---------------------------------------------------
+/* =====================================================
    ENTRADAS
---------------------------------------------------- */
+===================================================== */
 on("formEntry", "submit", async (e) => {
   e.preventDefault();
   const msg = $("entryMsg");
@@ -509,11 +533,11 @@ on("formEntry", "submit", async (e) => {
     return;
   }
 
-  const dateISO = $("entryDate")?.value;
-  const type = $("entryType")?.value;
-  const qty = safeNum($("entryQty")?.value, 0);
-  const desc = ($("entryDesc")?.value || "").trim();
-  const ref = ($("entryRef")?.value || "").trim();
+  const dateISO = $("entryDate") ? $("entryDate").value : "";
+  const type = $("entryType") ? $("entryType").value : "";
+  const desc = ($("entryDesc") ? $("entryDesc").value : "").trim();
+  const ref = ($("entryRef") ? $("entryRef").value : "").trim();
+  const qty = safeNum($("entryQty") ? $("entryQty").value : 0, 0);
 
   if (!dateISO || !type || !desc || qty <= 0) {
     setMsg(msg, "Campos inválidos. Revisa fecha, tipo, descripción y cantidad.", "warn");
@@ -522,12 +546,12 @@ on("formEntry", "submit", async (e) => {
 
   try {
     await addDoc(collection(db, "entries"), {
-      dateISO,
+      dateISO: dateISO,
       dateTS: parseDateToTs(dateISO),
-      type,
-      desc,
-      ref,
-      qty,
+      type: type,
+      desc: desc,
+      ref: ref,
+      qty: qty,
       available: qty,
       createdBy: currentUser.uid,
       createdByName: currentUserProfile.name || currentUser.email || "Usuario",
@@ -535,10 +559,11 @@ on("formEntry", "submit", async (e) => {
     });
 
     setMsg(msg, "✅ Entrada registrada correctamente.", "ok");
-    e.target.reset();
+
+    if ($("formEntry")) $("formEntry").reset();
     if ($("entryDate")) $("entryDate").value = todayISO();
 
-    entriesCache = await fetchEntries(500);
+    entriesCache = await fetchEntries(800);
     await refreshEntries();
     await refreshEntryDropdowns();
     await refreshDashboard();
@@ -549,70 +574,69 @@ on("formEntry", "submit", async (e) => {
 });
 
 on("btnReloadEntries", "click", async () => {
-  entriesCache = await fetchEntries(500);
+  entriesCache = await fetchEntries(800);
   await refreshEntries();
   await refreshEntryDropdowns();
   await refreshDashboard();
 });
 
 async function refreshEntries() {
-  const tbody = $("tblEntries")?.querySelector("tbody");
+  const tbody = $("tblEntries") ? $("tblEntries").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const typeFilter = $("filterEntryType")?.value || "";
-  const textFilter = ($("filterEntryText")?.value || "").trim().toLowerCase();
+  const typeFilter = $("filterEntryType") ? $("filterEntryType").value : "";
+  const textFilter = ($("filterEntryText") ? $("filterEntryText").value : "").trim().toLowerCase();
 
-  const rows = entriesCache.filter(r => {
+  const rows = entriesCache.filter((r) => {
     if (typeFilter && r.type !== typeFilter) return false;
-    const hay = `${r.desc ?? ""} ${r.ref ?? ""}`.toLowerCase();
-    if (textFilter && !hay.includes(textFilter)) return false;
+    const hay = ((r.desc || "") + " " + (r.ref || "")).toLowerCase();
+    if (textFilter && hay.indexOf(textFilter) < 0) return false;
     return true;
   });
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin resultados</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
     return;
   }
 
-  for (const r of rows) {
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.dateISO || "")}</td>
-      <td>${escapeHtml(r.type || "")}</td>
-      <td>${escapeHtml(r.desc || "")}</td>
-      <td>${escapeHtml(r.ref || "")}</td>
-      <td class="right">${escapeHtml(String(r.qty ?? ""))}</td>
-      <td class="right">${escapeHtml(String(r.available ?? ""))}</td>
-      <td>${escapeHtml(r.createdByName || "")}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
+      "<td>" + escapeHtml(r.type || "") + "</td>" +
+      "<td>" + escapeHtml(r.desc || "") + "</td>" +
+      "<td>" + escapeHtml(r.ref || "") + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.available || 0)) + "</td>" +
+      "<td>" + escapeHtml(r.createdByName || "") + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
 async function refreshEntryDropdowns() {
-  const list = entriesCache.slice().sort((a, b) => safeNum(b.dateTS) - safeNum(a.dateTS));
   const assignsSel = $("assignEntryId");
   const scrapSel = $("scrapEntryId");
 
-  const optHtml = (e) => {
-    const label = `${e.type || ""} · ${e.desc || ""} (Disp: ${e.available ?? 0})`;
-    return `<option value="${escapeHtml(e.id)}">${escapeHtml(label)}</option>`;
-  };
+  const list = entriesCache
+    .slice()
+    .sort((a, b) => safeNum(b.dateTS) - safeNum(a.dateTS))
+    .filter((e) => safeNum(e.available) > 0);
 
-  if (assignsSel) {
-    assignsSel.innerHTML = `<option value="">Seleccionar…</option>` +
-      list.filter(e => safeNum(e.available) > 0).map(optHtml).join("");
+  function opt(e) {
+    const label = (e.type || "") + " · " + (e.desc || "") + " (Disp: " + String(e.available || 0) + ")";
+    return '<option value="' + escapeHtml(e.id) + '">' + escapeHtml(label) + "</option>";
   }
-  if (scrapSel) {
-    scrapSel.innerHTML = `<option value="">Seleccionar…</option>` +
-      list.filter(e => safeNum(e.available) > 0).map(optHtml).join("");
-  }
+
+  const html = '<option value="">Seleccionar…</option>' + list.map(opt).join("");
+
+  if (assignsSel) assignsSel.innerHTML = html;
+  if (scrapSel) scrapSel.innerHTML = html;
 }
 
-/* ---------------------------------------------------
+/* =====================================================
    ASIGNACIONES
---------------------------------------------------- */
+===================================================== */
 on("formAssign", "submit", async (e) => {
   e.preventDefault();
   const msg = $("assignMsg");
@@ -623,13 +647,13 @@ on("formAssign", "submit", async (e) => {
     return;
   }
 
-  const dateISO = $("assignDate")?.value;
-  const entryId = $("assignEntryId")?.value;
-  const qty = safeNum($("assignQty")?.value, 0);
-  const reason = ($("assignReason")?.value || "").trim();
+  const dateISO = $("assignDate") ? $("assignDate").value : "";
+  const entryId = $("assignEntryId") ? $("assignEntryId").value : "";
+  const qty = safeNum($("assignQty") ? $("assignQty").value : 0, 0);
+  const reason = ($("assignReason") ? $("assignReason").value : "").trim();
 
-  const workerSelect = ($("assignWorkerSelect")?.value || "").trim();
-  const workerInput = ($("assignWorker")?.value || "").trim();
+  const workerSelect = ($("assignWorkerSelect") ? $("assignWorkerSelect").value : "").trim();
+  const workerInput = ($("assignWorker") ? $("assignWorker").value : "").trim();
   const worker = workerSelect || workerInput;
 
   if (!dateISO || !entryId || qty <= 0 || !worker || !reason) {
@@ -649,19 +673,19 @@ on("formAssign", "submit", async (e) => {
 
       tx.update(entryRef, { available: available - qty });
 
-      const label = `${entry.type || ""} · ${entry.desc || ""}`;
+      const label = (entry.type || "") + " · " + (entry.desc || "");
       const assignRef = doc(collection(db, "assignments"));
 
       tx.set(assignRef, {
-        dateISO,
+        dateISO: dateISO,
         dateTS: parseDateToTs(dateISO),
-        worker,
-        qty,
-        entryId,
+        worker: worker,
+        qty: qty,
+        entryId: entryId,
         entryLabel: label,
         entryType: entry.type || "",
         entryDesc: entry.desc || "",
-        reason,
+        reason: reason,
         createdBy: currentUser.uid,
         createdByName: currentUserProfile.name || currentUser.email || "Usuario",
         createdAt: serverTimestamp()
@@ -669,18 +693,18 @@ on("formAssign", "submit", async (e) => {
     });
 
     setMsg(msg, "✅ Asignación registrada.", "ok");
-    e.target.reset();
+    if ($("formAssign")) $("formAssign").reset();
     if ($("assignDate")) $("assignDate").value = todayISO();
 
-    entriesCache = await fetchEntries(500)️;
-    assignmentsCache = await fetchAssignments(500);
+    entriesCache = await fetchEntries(800);
+    assignmentsCache = await fetchAssignments(800);
 
     await refreshEntryDropdowns();
     await refreshAssignments();
     await refreshDashboard();
   } catch (err) {
     console.error(err);
-    if (String(err.message).includes("NO_STOCK")) {
+    if (String(err.message).indexOf("NO_STOCK") >= 0) {
       setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
       setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
@@ -689,51 +713,51 @@ on("formAssign", "submit", async (e) => {
 });
 
 on("btnReloadAssignments", "click", async () => {
-  assignmentsCache = await fetchAssignments(500);
+  assignmentsCache = await fetchAssignments(800);
   await refreshAssignments();
   await refreshDashboard();
 });
 
 async function refreshAssignments() {
-  const tbody = $("tblAssignments")?.querySelector("tbody");
+  const tbody = $("tblAssignments") ? $("tblAssignments").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const workerFilter = ($("filterAssignWorker")?.value || "").trim().toLowerCase();
-  const fromISO = $("filterAssignFrom")?.value || "";
-  const toISO = $("filterAssignTo")?.value || "";
+  const workerFilter = ($("filterAssignWorker") ? $("filterAssignWorker").value : "").trim().toLowerCase();
+  const fromISO = $("filterAssignFrom") ? $("filterAssignFrom").value : "";
+  const toISO = $("filterAssignTo") ? $("filterAssignTo").value : "";
 
-  const rows = assignmentsCache.filter(a => {
-    const hay = (a.worker || "").toLowerCase();
-    if (workerFilter && !hay.includes(workerFilter)) return false;
+  const rows = assignmentsCache.filter((a) => {
     if (!withinRange(safeNum(a.dateTS), fromISO, toISO)) return false;
+    if (workerFilter) {
+      const hay = (a.worker || "").toLowerCase();
+      if (hay.indexOf(workerFilter) < 0) return false;
+    }
     return true;
   });
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin resultados</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
     return;
   }
 
-  for (const r of rows) {
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.dateISO || "")}</td>
-      <td>${escapeHtml(r.worker || "")}</td>
-      <td>${escapeHtml(r.entryId || "")}</td>
-      <td>${escapeHtml(r.entryType || "")}</td>
-      <td>${escapeHtml(r.entryDesc || "")}</td>
-      <td class="right">${escapeHtml(String(r.qty ?? ""))}</td>
-      <td>${escapeHtml(r.createdByName || "")}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
+      "<td>" + escapeHtml(r.worker || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryId || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryType || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryDesc || "") + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
+      "<td>" + escapeHtml(r.createdByName || "") + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
-
-/* ---------------------------------------------------
+/* =====================================================
    MERMA
---------------------------------------------------- */
+===================================================== */
 on("formScrap", "submit", async (e) => {
   e.preventDefault();
   const msg = $("scrapMsg");
@@ -744,11 +768,11 @@ on("formScrap", "submit", async (e) => {
     return;
   }
 
-  const dateISO = $("scrapDate")?.value;
-  const entryId = $("scrapEntryId")?.value;
-  const qty = safeNum($("scrapQty")?.value, 0);
-  const reason = $("scrapReason")?.value || "";
-  const detail = ($("scrapDetail")?.value || "").trim();
+  const dateISO = $("scrapDate") ? $("scrapDate").value : "";
+  const entryId = $("scrapEntryId") ? $("scrapEntryId").value : "";
+  const qty = safeNum($("scrapQty") ? $("scrapQty").value : 0, 0);
+  const reason = $("scrapReason") ? $("scrapReason").value : "";
+  const detail = ($("scrapDetail") ? $("scrapDetail").value : "").trim();
 
   if (!dateISO || !entryId || qty <= 0 || !reason) {
     setMsg(msg, "Campos inválidos. Revisa fecha, ítem, cantidad y motivo.", "warn");
@@ -771,18 +795,18 @@ on("formScrap", "submit", async (e) => {
 
       tx.update(entryRef, { available: available - qty });
 
-      const label = `${entry.type || ""} · ${entry.desc || ""}`;
+      const label = (entry.type || "") + " · " + (entry.desc || "");
       const scrapRef = doc(collection(db, "scrap"));
 
       tx.set(scrapRef, {
-        dateISO,
+        dateISO: dateISO,
         dateTS: parseDateToTs(dateISO),
-        entryId,
+        entryId: entryId,
         entryLabel: label,
         entryType: entry.type || "",
         entryDesc: entry.desc || "",
-        qty,
-        reason,
+        qty: qty,
+        reason: reason,
         detail: reason === "Otro" ? detail : "",
         createdBy: currentUser.uid,
         createdByName: currentUserProfile.name || currentUser.email || "Usuario",
@@ -791,18 +815,18 @@ on("formScrap", "submit", async (e) => {
     });
 
     setMsg(msg, "✅ Merma registrada.", "ok");
-    e.target.reset();
+    if ($("formScrap")) $("formScrap").reset();
     if ($("scrapDate")) $("scrapDate").value = todayISO();
 
-    entriesCache = await fetchEntries(500);
-    scrapCache = await fetchScrap(500);
+    entriesCache = await fetchEntries(800);
+    scrapCache = await fetchScrap(800);
 
     await refreshEntryDropdowns();
     await refreshScrap();
     await refreshDashboard();
   } catch (err) {
     console.error(err);
-    if (String(err.message).includes("NO_STOCK")) {
+    if (String(err.message).indexOf("NO_STOCK") >= 0) {
       setMsg(msg, "❌ Cantidad supera disponible del ítem.", "bad");
     } else {
       setMsg(msg, "❌ No se pudo guardar. Revisa permisos/reglas.", "bad");
@@ -811,42 +835,55 @@ on("formScrap", "submit", async (e) => {
 });
 
 async function refreshScrap() {
-  const tbody = $("tblScrap")?.querySelector("tbody");
+  const tbody = $("tblScrap") ? $("tblScrap").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
 
   if (!scrapCache.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin datos</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin datos</td></tr>';
     return;
   }
 
-  for (const r of scrapCache) {
-    const motivo = r.reason === "Otro" ? `${r.reason}: ${r.detail || ""}` : (r.reason || "");
+  scrapCache.forEach((r) => {
+    const motivo = r.reason === "Otro" ? (r.reason + ": " + (r.detail || "")) : (r.reason || "");
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.dateISO || "")}</td>
-      <td>${escapeHtml(r.entryId || "")}</td>
-      <td>${escapeHtml(r.entryType || "")}</td>
-      <td>${escapeHtml(r.entryDesc || "")}</td>
-      <td class="right">${escapeHtml(String(r.qty ?? ""))}</td>
-      <td>${escapeHtml(motivo)}</td>
-      <td>${escapeHtml(r.createdByName || "")}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.dateISO || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryId || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryType || "") + "</td>" +
+      "<td>" + escapeHtml(r.entryDesc || "") + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.qty || 0)) + "</td>" +
+      "<td>" + escapeHtml(motivo) + "</td>" +
+      "<td>" + escapeHtml(r.createdByName || "") + "</td>";
     tbody.appendChild(tr);
+  });
+}
+
+/* =====================================================
+   SOLICITUDES
+   - incluye tipo "Solicitud"
+===================================================== */
+function ensureRequestTypeHasSolicitud() {
+  const sel = $("reqType");
+  if (!sel) return;
+
+  const exists = Array.from(sel.options).some((o) => (o.value || "").toLowerCase() === "solicitud");
+  if (!exists) {
+    const opt = document.createElement("option");
+    opt.value = "Solicitud";
+    opt.textContent = "Solicitud";
+    sel.appendChild(opt);
   }
 }
 
-/* ---------------------------------------------------
-   SOLICITUDES
---------------------------------------------------- */
 on("formRequest", "submit", async (e) => {
   e.preventDefault();
   const msg = $("reqMsg");
   setMsg(msg, "");
 
-  const type = $("reqType")?.value || "";
-  const text = ($("reqText")?.value || "").trim();
-  const priority = $("reqPriority")?.value || "Normal";
+  const type = $("reqType") ? $("reqType").value : "";
+  const text = ($("reqText") ? $("reqText").value : "").trim();
+  const priority = $("reqPriority") ? $("reqPriority").value : "Normal";
 
   if (!type || !text) {
     setMsg(msg, "Completa tipo y detalle.", "warn");
@@ -855,9 +892,9 @@ on("formRequest", "submit", async (e) => {
 
   try {
     await addDoc(collection(db, "requests"), {
-      type,
-      text,
-      priority,
+      type: type,
+      text: text,
+      priority: priority,
       status: "Pendiente",
       response: "",
       createdBy: currentUser.uid,
@@ -866,9 +903,9 @@ on("formRequest", "submit", async (e) => {
     });
 
     setMsg(msg, "✅ Solicitud creada.", "ok");
-    e.target.reset();
+    if ($("formRequest")) $("formRequest").reset();
 
-    requestsCache = await fetchRequests(500);
+    requestsCache = await fetchRequests(800);
     await refreshRequests();
     await refreshDashboard();
   } catch (err) {
@@ -878,52 +915,56 @@ on("formRequest", "submit", async (e) => {
 });
 
 on("btnReloadRequests", "click", async () => {
-  requestsCache = await fetchRequests(500);
+  requestsCache = await fetchRequests(800);
   await refreshRequests();
   await refreshDashboard();
 });
 
 async function refreshRequests() {
-  const tbody = $("tblRequests")?.querySelector("tbody");
+  ensureRequestTypeHasSolicitud();
+
+  const tbody = $("tblRequests") ? $("tblRequests").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const statusFilter = $("filterReqStatus")?.value || "";
-  const textFilter = ($("filterReqText")?.value || "").trim().toLowerCase();
+  const statusFilter = $("filterReqStatus") ? $("filterReqStatus").value : "";
+  const textFilter = ($("filterReqText") ? $("filterReqText").value : "").trim().toLowerCase();
 
-  const rows = requestsCache.filter(r => {
+  const rows = requestsCache.filter((r) => {
     const status = r.status || "Pendiente";
     if (statusFilter && status !== statusFilter) return false;
 
-    const hay = `${r.type || ""} ${r.text || ""}`.toLowerCase();
-    if (textFilter && !hay.includes(textFilter)) return false;
+    const hay = ((r.type || "") + " " + (r.text || "")).toLowerCase();
+    if (textFilter && hay.indexOf(textFilter) < 0) return false;
 
     return true;
   });
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin resultados</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
     return;
   }
 
-  for (const r of rows) {
+  rows.forEach((r) => {
     const isPending = (r.status || "Pendiente") === "Pendiente";
     const canAnswer = canWrite() && isPending;
 
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(formatTimestamp(r.createdAt) || "")}</td>
-      <td>${escapeHtml(r.type || "")}</td>
-      <td>${escapeHtml(r.text || "")}</td>
-      <td>${escapeHtml(r.priority || "")}</td>
-      <td>${escapeHtml(r.status || "")}</td>
-      <td>${escapeHtml(r.response || "")}</td>
-      <td>
-        ${canAnswer ? `<button class="btn btn--ghost" data-action="answer" data-id="${escapeHtml(r.id)}">Responder</button>` : `<span class="muted small">—</span>`}
-      </td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(formatTimestamp(r.createdAt) || "") + "</td>" +
+      "<td>" + escapeHtml(r.type || "") + "</td>" +
+      "<td>" + escapeHtml(r.text || "") + "</td>" +
+      "<td>" + escapeHtml(r.priority || "") + "</td>" +
+      "<td>" + escapeHtml(r.status || "") + "</td>" +
+      "<td>" + escapeHtml(r.response || "") + "</td>" +
+      "<td>" +
+      (canAnswer
+        ? '<button class="btn btn--ghost" data-action="answer" data-id="' + escapeHtml(r.id) + '">Responder</button>'
+        : '<span class="muted small">—</span>') +
+      "</td>";
+
     tbody.appendChild(tr);
-  }
+  });
 
   tbody.onclick = async (ev) => {
     const btn = ev.target.closest("button[data-action]");
@@ -936,15 +977,13 @@ async function refreshRequests() {
 
 async function answerRequest(requestId) {
   if (!canWrite()) return;
-
   const response = prompt("Ingrese respuesta (quedará registrada):");
   if (response === null) return;
   const txt = response.trim();
   if (!txt) return;
 
   try {
-    const ref = doc(db, "requests", requestId);
-    await updateDoc(ref, {
+    await updateDoc(doc(db, "requests", requestId), {
       status: "Respondida",
       response: txt,
       respondedBy: currentUser.uid,
@@ -952,7 +991,7 @@ async function answerRequest(requestId) {
       respondedAt: serverTimestamp()
     });
 
-    requestsCache = await fetchRequests(500);
+    requestsCache = await fetchRequests(800);
     await refreshRequests();
     await refreshDashboard();
   } catch (e) {
@@ -961,15 +1000,19 @@ async function answerRequest(requestId) {
   }
 }
 
-/* ---------------------------------------------------
+/* =====================================================
    INFORMES
---------------------------------------------------- */
+   - Selección trabajador desde employees
+   - Incluye mermas
+   - Total merma + stock restante total
+===================================================== */
 on("btnRunReport", "click", async () => {
   await runReport();
 });
 
 on("btnExportCSV", "click", () => {
-  if (!reportRows?.length) return;
+  if (!reportRows.length) return;
+
   const headers = ["Fecha", "TipoMov", "TipoEntrada", "Trabajador", "Entrada", "Descripcion", "Cantidad", "Motivo"];
   const csv = toCSV(reportRows, headers);
   downloadText("reporte_apa.csv", csv, "text/csv");
@@ -979,125 +1022,128 @@ async function runReport() {
   const msg = $("reportMsg");
   setMsg(msg, "Generando informe...", "info");
 
-  entriesCache = await fetchEntries(1000);
-  assignmentsCache = await fetchAssignments(1000);
-  scrapCache = await fetchScrap(1000);
+  entriesCache = await fetchEntries(1200);
+  assignmentsCache = await fetchAssignments(1200);
+  scrapCache = await fetchScrap(1200);
 
-  const mode = $("reportMode")?.value || "worker";
+  const mode = $("reportMode") ? $("reportMode").value : "worker";
 
-  const workerSelect = ($("reportWorkerSelect")?.value || "").trim();
-  const filterText = ($("reportFilter")?.value || "").trim();
+  const workerSelect = ($("reportWorkerSelect") ? $("reportWorkerSelect").value : "").trim();
+  const filterText = ($("reportFilter") ? $("reportFilter").value : "").trim();
   const effectiveFilter = workerSelect || filterText;
 
-  const fromISO = $("reportFrom")?.value || "";
-  const toISO = $("reportTo")?.value || "";
+  const fromISO = $("reportFrom") ? $("reportFrom").value : "";
+  const toISO = $("reportTo") ? $("reportTo").value : "";
 
   const rows = [];
 
-  for (const a of assignmentsCache) {
+  // Asignaciones
+  assignmentsCache.forEach((a) => {
     const ts = safeNum(a.dateTS);
-    if (!withinRange(ts, fromISO, toISO)) continue;
+    if (!withinRange(ts, fromISO, toISO)) return;
 
     if (mode === "worker") {
       if (effectiveFilter) {
         const hay = (a.worker || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) continue;
+        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
       }
     } else {
       if (effectiveFilter) {
         const hay = (a.entryType || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) continue;
+        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
       }
     }
 
     rows.push({
-      "Fecha": a.dateISO || "",
-      "TipoMov": "Asignación",
-      "TipoEntrada": a.entryType || "",
-      "Trabajador": a.worker || "",
-      "Entrada": a.entryId || "",
-      "Descripcion": a.entryDesc || "",
-      "Cantidad": safeNum(a.qty),
-      "Motivo": a.reason || ""
+      Fecha: a.dateISO || "",
+      TipoMov: "Asignación",
+      TipoEntrada: a.entryType || "",
+      Trabajador: a.worker || "",
+      Entrada: a.entryId || "",
+      Descripcion: a.entryDesc || "",
+      Cantidad: safeNum(a.qty),
+      Motivo: a.reason || ""
     });
-  }
+  });
 
-  for (const s of scrapCache) {
+  // Mermas
+  scrapCache.forEach((s) => {
     const ts = safeNum(s.dateTS);
-    if (!withinRange(ts, fromISO, toISO)) continue;
+    if (!withinRange(ts, fromISO, toISO)) return;
 
-    if (mode === "worker") {
-      if (effectiveFilter) continue;
-    } else {
+    if (mode !== "worker") {
       if (effectiveFilter) {
         const hay = (s.entryType || "").toLowerCase();
-        if (!hay.includes(effectiveFilter.toLowerCase())) continue;
+        if (hay.indexOf(effectiveFilter.toLowerCase()) < 0) return;
       }
+    } else {
+      // En modo worker, merma no tiene trabajador -> se incluye solo si no hay filtro
+      if (effectiveFilter) return;
     }
 
-    const motivo = s.reason === "Otro" ? `${s.reason}: ${s.detail || ""}` : (s.reason || "");
+    const motivo = s.reason === "Otro" ? (s.reason + ": " + (s.detail || "")) : (s.reason || "");
     rows.push({
-      "Fecha": s.dateISO || "",
-      "TipoMov": "Merma",
-      "TipoEntrada": s.entryType || "",
-      "Trabajador": "",
-      "Entrada": s.entryId || "",
-      "Descripcion": s.entryDesc || "",
-      "Cantidad": safeNum(s.qty),
-      "Motivo": motivo
+      Fecha: s.dateISO || "",
+      TipoMov: "Merma",
+      TipoEntrada: s.entryType || "",
+      Trabajador: "",
+      Entrada: s.entryId || "",
+      Descripcion: s.entryDesc || "",
+      Cantidad: safeNum(s.qty),
+      Motivo: motivo
     });
-  }
+  });
 
-  rows.sort((a, b) => (parseDateToTs(b.Fecha) || 0) - (parseDateToTs(a.Fecha) || 0));
-
+  rows.sort((a, b) => parseDateToTs(b.Fecha) - parseDateToTs(a.Fecha));
   reportRows = rows;
+
   renderReportTable(rows);
 
   const totalCount = rows.length;
   const totalQty = rows.reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
-
-  const totalScrap = rows.filter(r => r.TipoMov === "Merma").reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
-  const totalRemaining = entriesCache.reduce((acc, e) => acc + safeNum(e.available), 0);
+  const totalScrap = rows.filter((r) => r.TipoMov === "Merma").reduce((acc, r) => acc + safeNum(r.Cantidad), 0);
+  const remainingTotal = entriesCache.reduce((acc, e) => acc + safeNum(e.available), 0);
 
   if ($("reportCount")) $("reportCount").textContent = String(totalCount);
   if ($("reportQty")) $("reportQty").textContent = String(totalQty);
   if ($("reportScrapTotal")) $("reportScrapTotal").textContent = String(totalScrap);
-  if ($("reportRemainingTotal")) $("reportRemainingTotal").textContent = String(totalRemaining);
+  if ($("reportRemainingTotal")) $("reportRemainingTotal").textContent = String(remainingTotal);
 
   const btnCSV = $("btnExportCSV");
   if (btnCSV) btnCSV.disabled = rows.length === 0;
 
-  setMsg(msg, `✅ Informe listo (${totalCount} registros).`, "ok");
+  setMsg(msg, "✅ Informe listo (" + String(totalCount) + " registros).", "ok");
 }
 
 function renderReportTable(rows) {
-  const tbody = $("tblReport")?.querySelector("tbody");
+  const tbody = $("tblReport") ? $("tblReport").querySelector("tbody") : null;
   if (!tbody) return;
   tbody.innerHTML = "";
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">Sin resultados</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="7" class="muted">Sin resultados</td></tr>';
     return;
   }
 
-  for (const r of rows) {
+  rows.forEach((r) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(r.Fecha)}</td>
-      <td>${escapeHtml(r.TipoEntrada)}</td>
-      <td>${escapeHtml(r.Trabajador || "")}</td>
-      <td>${escapeHtml(r.Entrada)}</td>
-      <td>${escapeHtml(r.Descripcion)}</td>
-      <td class="right">${escapeHtml(String(r.Cantidad))}</td>
-      <td>${escapeHtml(r.Motivo || r.TipoMov)}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(r.Fecha) + "</td>" +
+      "<td>" + escapeHtml(r.TipoEntrada) + "</td>" +
+      "<td>" + escapeHtml(r.Trabajador || "") + "</td>" +
+      "<td>" + escapeHtml(r.Entrada) + "</td>" +
+      "<td>" + escapeHtml(r.Descripcion) + "</td>" +
+      '<td class="right">' + escapeHtml(String(r.Cantidad)) + "</td>" +
+      "<td>" + escapeHtml(r.Motivo || r.TipoMov) + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
-/* ---------------------------------------------------
+/* =====================================================
    EMPLEADOS (ADMIN)
---------------------------------------------------- */
+   - Crea usuario en Auth con secondaryAuth
+   - Guarda en employees/{uid} y users/{uid}
+===================================================== */
 on("btnCreateEmployee", "click", async () => {
   const msg = $("empMsg");
   setMsg(msg, "");
@@ -1107,12 +1153,21 @@ on("btnCreateEmployee", "click", async () => {
     return;
   }
 
-  const first = ($("empFirst")?.value || "").trim();
-  const last = ($("empLast")?.value || "").trim();
-  const email = ($("empEmail")?.value || "").trim().toLowerCase();
-  const pass = $("empPass")?.value || "";
-  const r = $("empRole")?.value || "consulta";
-  const active = ($("empActive")?.value || "true") === "true";
+  if (!secondaryAuth) {
+    setMsg(
+      msg,
+      "❌ secondaryAuth no está disponible. Revisa firebase.js (debe exportar secondaryAuth).",
+      "bad"
+    );
+    return;
+  }
+
+  const first = ($("empFirst") ? $("empFirst").value : "").trim();
+  const last = ($("empLast") ? $("empLast").value : "").trim();
+  const email = ($("empEmail") ? $("empEmail").value : "").trim().toLowerCase();
+  const pass = $("empPass") ? $("empPass").value : "";
+  const r = $("empRole") ? $("empRole").value : "consulta";
+  const active = ($("empActive") ? $("empActive").value : "true") === "true";
 
   if (!first || !last || !email || pass.length < 6) {
     setMsg(msg, "Completa nombre, apellidos, correo y clave (mínimo 6).", "warn");
@@ -1124,41 +1179,45 @@ on("btnCreateEmployee", "click", async () => {
   try {
     const cred = await createUserWithEmailAndPassword(secondaryAuth, email, pass);
 
-    try { await updateProfile(cred.user, { displayName: `${first} ${last}` }); } catch {}
+    try {
+      await updateProfile(cred.user, { displayName: first + " " + last });
+    } catch (e) {
+      // no bloquea
+    }
 
     const uid = cred.user.uid;
-    const fullName = `${first} ${last}`;
+    const fullName = first + " " + last;
 
     setMsg(msg, "Guardando perfil en Firestore...", "info");
 
     await setDoc(doc(db, "employees", uid), {
-      uid,
-      first,
-      last,
+      uid: uid,
+      first: first,
+      last: last,
       name: fullName,
-      email,
+      email: email,
       role: r,
-      active,
+      active: active,
       createdBy: currentUser.uid,
       createdByName: currentUserProfile.name || currentUser.email || "Usuario",
       createdAt: serverTimestamp()
     });
 
     await setDoc(doc(db, "users", uid), {
-      first,
-      last,
+      first: first,
+      last: last,
       name: fullName,
-      email,
+      email: email,
       role: r,
-      active
+      active: active
     });
 
-    $("empFirst").value = "";
-    $("empLast").value = "";
-    $("empEmail").value = "";
-    $("empPass").value = "";
-    $("empRole").value = "consulta";
-    $("empActive").value = "true";
+    if ($("empFirst")) $("empFirst").value = "";
+    if ($("empLast")) $("empLast").value = "";
+    if ($("empEmail")) $("empEmail").value = "";
+    if ($("empPass")) $("empPass").value = "";
+    if ($("empRole")) $("empRole").value = "consulta";
+    if ($("empActive")) $("empActive").value = "true";
 
     setMsg(msg, "✅ Empleado creado. Ya puede iniciar sesión.", "ok");
 
@@ -1166,11 +1225,11 @@ on("btnCreateEmployee", "click", async () => {
     fillWorkersUIFromEmployees();
   } catch (err) {
     console.error(err);
-    const code = err?.code || "";
-    if (code.includes("auth/email-already-in-use")) {
+    const code = err && err.code ? err.code : "";
+    if (code.indexOf("auth/email-already-in-use") >= 0) {
       setMsg(msg, "❌ Ese correo ya está registrado.", "bad");
     } else {
-      setMsg(msg, `❌ Error al crear empleado (${code || "desconocido"}).`, "bad");
+      setMsg(msg, "❌ Error al crear empleado (" + (code || "desconocido") + ").", "bad");
     }
   }
 });
@@ -1181,81 +1240,75 @@ on("btnReloadEmployees", "click", async () => {
 });
 
 async function refreshEmployees() {
-  employeesCache = await fetchEmployees(1000);
+  employeesCache = await fetchEmployees(1200);
   renderEmployeesTable();
-  fillWorkersUIFromEmployees();
 }
 
 function renderEmployeesTable() {
-  const tbody = $("tblEmployees")?.querySelector("tbody");
+  const tbody = $("tblEmployees") ? $("tblEmployees").querySelector("tbody") : null;
   if (!tbody) return;
 
   tbody.innerHTML = "";
 
   if (!employeesCache.length) {
-    tbody.innerHTML = `<tr><td colspan="4" class="muted">Sin datos</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="4" class="muted">Sin datos</td></tr>';
     return;
   }
 
-  for (const e of employeesCache) {
+  employeesCache.forEach((e) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(e.name || `${e.first || ""} ${e.last || ""}`)}</td>
-      <td>${escapeHtml(e.email || "")}</td>
-      <td>${escapeHtml(e.role || "")}</td>
-      <td>${e.active === false ? "No" : "Sí"}</td>
-    `;
+    tr.innerHTML =
+      "<td>" + escapeHtml(e.name || ((e.first || "") + " " + (e.last || ""))) + "</td>" +
+      "<td>" + escapeHtml(e.email || "") + "</td>" +
+      "<td>" + escapeHtml(e.role || "") + "</td>" +
+      "<td>" + (e.active === false ? "No" : "Sí") + "</td>";
     tbody.appendChild(tr);
-  }
+  });
 }
 
+/* =====================================================
+   Trabajadores: llenar selects desde employees
+===================================================== */
 function fillWorkersUIFromEmployees() {
-  const active = (employeesCache || []).filter(e => e.active !== false);
+  const active = (employeesCache || []).filter((e) => e.active !== false);
 
   const selAssign = $("assignWorkerSelect");
   if (selAssign) {
     selAssign.innerHTML =
-      `<option value="">(Seleccionar trabajador)</option>` +
-      active.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
+      '<option value="">(Seleccionar trabajador)</option>' +
+      active
+        .map((e) => '<option value="' + escapeHtml(e.name) + '">' + escapeHtml(e.name) + "</option>")
+        .join("");
   }
 
   const selReport = $("reportWorkerSelect");
   if (selReport) {
     selReport.innerHTML =
-      `<option value="">(Todos / sin filtro)</option>` +
-      active.map(e => `<option value="${escapeHtml(e.name)}">${escapeHtml(e.name)}</option>`).join("");
+      '<option value="">(Todos / sin filtro)</option>' +
+      active
+        .map((e) => '<option value="' + escapeHtml(e.name) + '">' + escapeHtml(e.name) + "</option>")
+        .join("");
   }
 }
 
-/* ---------------------------------------------------
-   Utils
---------------------------------------------------- */
-function withinRange(ts, fromISO, toISO) {
-  const from = parseDateToTs(fromISO);
-  const to = parseDateToTs(toISO);
-  if (from && ts < from) return false;
-  if (to && ts > (to + 24 * 60 * 60 * 1000 - 1)) return false;
-  return true;
-}
-
-function formatTimestamp(tsObj) {
-  if (!tsObj) return "";
-  try {
-    const d = tsObj.toDate();
-    return d.toISOString().slice(0, 10);
-  } catch {
-    return "";
-  }
-}
-
-/* ---------------------------------------------------
+/* =====================================================
    BOOT
---------------------------------------------------- */
+===================================================== */
 (function boot() {
-  console.log("[APA] app.js cargado OK (sin utils.js)");
+  console.log("[APA] app.js FINAL COMPLETO cargado OK");
   setupPasswordToggles();
   showLoginOnly();
   setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
+
+  // Fechas por defecto si existen
+  const ids = ["entryDate", "assignDate", "scrapDate"];
+  ids.forEach((id) => {
+    const el = $(id);
+    if (el) el.value = todayISO();
+  });
+
+  // Asegurar que reqType tenga "Solicitud" al cargar
+  ensureRequestTypeHasSolicitud();
 })();
 
 
