@@ -37,6 +37,7 @@
       <button class="tab" data-view="view-requests">Solicitudes</button>
       <button class="tab" data-view="view-reports">Informes</button>
       <button class="tab" data-view="view-employees" id="tabEmployees">Empleados</button>
+      <button class="tab" data-view="view-admin" id="tabAdmin">Admin</button>
     </nav>
 
     <!-- Vistas -->
@@ -145,8 +146,7 @@
               <div>
                 <label>Trabajador (desde BD)</label>
                 <select id="assignWorkerSelect"></select>
-                <div class="muted small">Si no aparece, escribe manual:</div>
-                <input id="assignWorker" type="text" placeholder="Nombre trabajador (manual)" />
+                <div class="muted small">Solo usuarios registrados (empleados) pueden recibir asignaciones.</div>
               </div>
               <div><label>Cantidad</label><input id="assignQty" type="number" min="1" /></div>
             </div>
@@ -176,7 +176,7 @@
           <div class="table-wrap">
             <table id="tblAssignments" class="table">
               <thead>
-                <tr><th>Fecha</th><th>Trabajador</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Registrado por</th></tr>
+                <tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -223,7 +223,7 @@
           <div class="table-wrap">
             <table id="tblScrap" class="table">
               <thead>
-                <tr><th>Fecha</th><th>EntryId</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
+                <tr><th>Fecha</th><th>Ítem</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -295,18 +295,19 @@
 
           <div class="grid3">
             <div>
-              <label>Modo</label>
+              <label>Tipo de informe</label>
               <select id="reportMode">
-                <option value="worker">Por trabajador</option>
-                <option value="type">Por tipo de entrada</option>
+                <option value="assign_worker">Asignaciones (por trabajador)</option>
+                <option value="mov_type">Movimientos (por tipo: asignación + merma)</option>
+                <option value="stock">Stock actual (entradas y disponible)</option>
               </select>
             </div>
 
             <div>
-              <label>Trabajador (desde BD)</label>
-              <select id="reportWorkerSelect"></select>
-              <div class="muted small">o filtro texto:</div>
-              <input id="reportFilter" type="text" placeholder="Ej: Maritza / EPP" />
+              <label>Filtro principal</label>
+              <select id="reportPrimarySelect"></select>
+              <div class="muted small">Opcional: filtro texto (busca en descripción / motivo)</div>
+              <input id="reportFilter" type="text" placeholder="Ej: Maritza / tenida / vencimiento" />
             </div>
 
             <div>
@@ -335,7 +336,55 @@
           <div class="table-wrap">
             <table id="tblReport" class="table">
               <thead>
-                <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>EntryId</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
+                <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>Ítem/ID</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADMIN (Borrados / correcciones) -->
+      <section id="view-admin" class="view" hidden>
+        <div class="card">
+          <h2>Admin (Corrección de BD)</h2>
+          <p class="muted">Herramientas para eliminar registros ingresados por error (solo admin). Al borrar una asignación o merma, el stock se devuelve automáticamente.</p>
+
+          <div class="grid3">
+            <div>
+              <label>Entidad</label>
+              <select id="adminEntity">
+                <option value="assignments">Asignaciones</option>
+                <option value="scrap">Mermas</option>
+                <option value="entries">Entradas</option>
+                <option value="requests">Solicitudes</option>
+                <option value="employees">Trabajadores</option>
+              </select>
+            </div>
+            <div>
+              <label>Ver últimos</label>
+              <select id="adminLimit">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="row" style="margin-top:22px;">
+              <button id="btnAdminLoad" class="btn">Cargar</button>
+            </div>
+          </div>
+
+          <div id="adminMsg" class="msg info">—</div>
+
+          <div class="table-wrap">
+            <table id="tblAdmin" class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Detalle</th>
+                  <th class="right">Cant.</th>
+                  <th>Acción</th>
+                </tr>
               </thead>
               <tbody></tbody>
             </table>
