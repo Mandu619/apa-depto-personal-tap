@@ -1,6 +1,13 @@
 /******************************************************
  * APA - Sistema de Registros (TAP)
- * app.js FINAL (corrige import downloadText)
+ * app.js FINAL DEFINITIVO
+ * - NO depende de utils.js (evita errores de exports)
+ * - Login profesional + toggles password
+ * - Admin crea empleados (Auth + Firestore)
+ * - Selectores trabajadores en Asignación e Informes
+ * - Informes incluyen merma + stock restante total
+ * - Solicitudes incluye tipo "Solicitud"
+ *
  * Requiere firebase.js exportando:
  *   export const auth, db, secondaryAuth
  ******************************************************/
@@ -30,26 +37,15 @@ import {
   runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-import {
-  todayISO,
-  setMsg,
-  escapeHtml,
-  toCSV,
-  parseDateToTs
-} from "./utils.js";
-
 /* ---------------------------------------------------
-   Helpers DOM
+   ✅ Utils internos (sin utils.js)
 --------------------------------------------------- */
 const $ = (id) => document.getElementById(id);
+const qsa = (sel) => Array.from(document.querySelectorAll(sel));
 
 function on(id, evt, fn) {
   const el = $(id);
   if (el) el.addEventListener(evt, fn);
-}
-
-function qsa(sel) {
-  return Array.from(document.querySelectorAll(sel));
 }
 
 function safeNum(v, def = 0) {
@@ -57,29 +53,84 @@ function safeNum(v, def = 0) {
   return Number.isFinite(n) ? n : def;
 }
 
-function scrollTopInstant() {
-  try {
-    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
-  } catch {
-    window.scrollTo(0, 0);
-  }
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
 
-/* ---------------------------------------------------
-   ✅ FIX: downloadText dentro de app.js
---------------------------------------------------- */
+function parseDateToTs(iso) {
+  if (!iso) return 0;
+  const t = Date.parse(`${iso}T00:00:00`);
+  return Number.isFinite(t) ? t : 0;
+}
+
+function escapeHtml(str) {
+  const s = String(str ?? "");
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function setMsg(el, text, kind = "") {
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "msg";
+  if (kind) el.classList.add(kind);
+}
+
+function toCSV(rows, headers) {
+  const esc = (v) => {
+    const s = String(v ?? "");
+    if (s.includes('"') || s.includes(",") || s.includes("\n")) {
+      return `"${s.replaceAll('"', '""')}"`;
+    }
+    return s;
+  };
+
+  const head = headers.join(",");
+  const body = rows.map(r => headers.map(h => esc(r[h])).join(",")).join("\n");
+  return `${head}\n${body}`;
+}
+
 function downloadText(filename, text, mime = "text/plain") {
   const blob = new Blob([text], { type: mime });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
-
   URL.revokeObjectURL(url);
+}
+
+function withinRange(ts, fromISO, toISO) {
+  const from = parseDateToTs(fromISO);
+  const to = parseDateToTs(toISO);
+  if (from && ts < from) return false;
+  if (to && ts > (to + 24 * 60 * 60 * 1000 - 1)) return false;
+  return true;
+}
+
+function formatTimestamp(tsObj) {
+  if (!tsObj) return "";
+  try {
+    const d = tsObj.toDate();
+    return d.toISOString().slice(0, 10);
+  } catch {
+    return "";
+  }
+}
+
+function scrollTopInstant() {
+  try { window.scrollTo({ top: 0, left: 0, behavior: "instant" }); }
+  catch { window.scrollTo(0, 0); }
 }
 
 /* ---------------------------------------------------
@@ -148,12 +199,12 @@ function isAdmin() {
    UI state control
 --------------------------------------------------- */
 function showLoginOnly() {
-  if ($("loginCard")) $("loginCard").hidden = false;
+  if ($("loginWrap")) $("loginWrap").hidden = false;
   if (navTabs) navTabs.hidden = true;
   if (appShell) appShell.hidden = true;
   views.forEach(v => v.hidden = true);
-  if (btnLogout) btnLogout.disabled = true;
 
+  if (btnLogout) btnLogout.disabled = true;
   if (userName) userName.textContent = "No autenticado";
   if (userRole) userRole.textContent = "—";
 
@@ -161,7 +212,7 @@ function showLoginOnly() {
 }
 
 function showAppShell() {
-  if ($("loginCard")) $("loginCard").hidden = true;
+  if ($("loginWrap")) $("loginWrap").hidden = true;
   if (appShell) appShell.hidden = false;
   if (navTabs) navTabs.hidden = false;
   if (btnLogout) btnLogout.disabled = false;
@@ -174,7 +225,6 @@ function showAppShell() {
 function applyRoleToUI() {
   const writer = canWrite();
 
-  // Disable submits if cannot write
   const entryBtn = $("formEntry")?.querySelector('button[type="submit"]');
   if (entryBtn) entryBtn.disabled = !writer;
 
@@ -184,7 +234,6 @@ function applyRoleToUI() {
   const scrapBtn = $("formScrap")?.querySelector('button[type="submit"]');
   if (scrapBtn) scrapBtn.disabled = !writer;
 
-  // Employees tab only admin
   const empTabBtn = document.querySelector('[data-view="view-employees"]');
   if (empTabBtn) empTabBtn.hidden = !isAdmin();
 }
@@ -193,7 +242,6 @@ function applyRoleToUI() {
    Password toggles
 --------------------------------------------------- */
 function setupPasswordToggles() {
-  // Login
   on("btnTogglePassword", "click", () => {
     const input = $("loginPassword");
     const btn = $("btnTogglePassword");
@@ -204,7 +252,6 @@ function setupPasswordToggles() {
     btn.textContent = isPwd ? "🙈" : "👁️";
   });
 
-  // Employee create (admin)
   on("btnToggleEmpPass", "click", () => {
     const input = $("empPass");
     const btn = $("btnToggleEmpPass");
@@ -217,7 +264,7 @@ function setupPasswordToggles() {
 }
 
 /* ---------------------------------------------------
-   Load profile /users/{uid}
+   Profile /users/{uid}
 --------------------------------------------------- */
 async function loadUserProfile(uid) {
   const ref = doc(db, "users", uid);
@@ -226,7 +273,7 @@ async function loadUserProfile(uid) {
 }
 
 /* ---------------------------------------------------
-   AUTH Handlers
+   AUTH
 --------------------------------------------------- */
 on("btnLogin", "click", async () => {
   const email = ($("loginEmail")?.value || "").trim();
@@ -263,11 +310,7 @@ on("btnLogin", "click", async () => {
 });
 
 on("btnLogout", "click", async () => {
-  try {
-    await signOut(auth);
-  } catch (e) {
-    console.error(e);
-  }
+  try { await signOut(auth); } catch (e) { console.error(e); }
 });
 
 onAuthStateChanged(auth, async (u) => {
@@ -286,7 +329,7 @@ onAuthStateChanged(auth, async (u) => {
     showLoginOnly();
     setMsg(
       $("loginMsg"),
-      "⚠️ Usuario existe en Authentication, pero falta su perfil en Firestore: users/{uid}. Pide al admin crearlo.",
+      "⚠️ Usuario existe en Authentication, pero falta perfil en Firestore: users/{uid}. Pide al admin crearlo.",
       "warn"
     );
     return;
@@ -316,18 +359,7 @@ onAuthStateChanged(auth, async (u) => {
 });
 
 /* ---------------------------------------------------
-   Preload caches
---------------------------------------------------- */
-async function preloadAll() {
-  entriesCache = await fetchEntries(500);
-  assignmentsCache = await fetchAssignments(500);
-  scrapCache = await fetchScrap(500);
-  requestsCache = await fetchRequests(500);
-  employeesCache = isAdmin() ? await fetchEmployees(1000) : [];
-}
-
-/* ---------------------------------------------------
-   Fetch functions
+   Fetch
 --------------------------------------------------- */
 async function fetchEntries(n = 200) {
   try {
@@ -394,8 +426,16 @@ async function fetchEmployees(n = 200) {
   }
 }
 
+async function preloadAll() {
+  entriesCache = await fetchEntries(500);
+  assignmentsCache = await fetchAssignments(500);
+  scrapCache = await fetchScrap(500);
+  requestsCache = await fetchRequests(500);
+  employeesCache = isAdmin() ? await fetchEmployees(1000) : [];
+}
+
 /* ---------------------------------------------------
-   Dashboard
+   DASHBOARD
 --------------------------------------------------- */
 async function refreshDashboard() {
   const now = Date.now();
@@ -632,7 +672,7 @@ on("formAssign", "submit", async (e) => {
     e.target.reset();
     if ($("assignDate")) $("assignDate").value = todayISO();
 
-    entriesCache = await fetchEntries(500);
+    entriesCache = await fetchEntries(500)️;
     assignmentsCache = await fetchAssignments(500);
 
     await refreshEntryDropdowns();
@@ -689,6 +729,7 @@ async function refreshAssignments() {
     tbody.appendChild(tr);
   }
 }
+
 
 /* ---------------------------------------------------
    MERMA
@@ -1211,9 +1252,10 @@ function formatTimestamp(tsObj) {
    BOOT
 --------------------------------------------------- */
 (function boot() {
-  console.log("[APA] app.js cargado OK");
+  console.log("[APA] app.js cargado OK (sin utils.js)");
   setupPasswordToggles();
   showLoginOnly();
   setMsg($("loginMsg"), "Ingresa tus credenciales para continuar.", "info");
 })();
+
 
