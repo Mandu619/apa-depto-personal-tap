@@ -43,4 +43,3 @@ export function downloadCSV(filename, rows) {
   a.click();
   document.body.removeChild(a);
 }
-
