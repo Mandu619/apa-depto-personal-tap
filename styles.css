@@ -53,16 +53,6 @@
   font-size:12px;
 }
 
-.apa-userbox{
-  display:flex;
-  align-items:center;
-  gap:12px;
-}
-
-.apa-usertext{
-  text-align:right;
-}
-
 /* SECTION spacing */
 .apa-section{
   padding-top: 18px;
@@ -80,6 +70,16 @@
   border-radius: 10px;
   border: 1px solid var(--apa-border);
   box-shadow: none;
+}
+
+/* ===== FIX: evitar textos sobrepuestos (Login) ===== */
+.apa-loginBox .apa-h1{
+  margin: 0 0 6px 0 !important;
+  line-height: 1.2;
+}
+.apa-loginBox .apa-sub{
+  margin: 0 0 14px 0 !important;
+  line-height: 1.25;
 }
 
 /* KPI */
@@ -102,26 +102,25 @@
   font-weight:700;
 }
 
-/* Tab activo: tu JS agrega .active al elemento .tab, pero Bulma usa li.is-active.
-   Entonces hacemos que se vea bien igual. */
+/* Tu JS agrega .active a .tab */
 .tab.active{
   color:#fff !important;
 }
 
-/* Tablas: un poquito más “SAP/ERP” */
+/* Tablas */
 .apa-tableWrap{
   border: 1px solid var(--apa-border);
   border-radius: 10px;
   overflow: hidden;
 }
 
-/* Notificaciones: que se vean discretas */
+/* Notificaciones: discretas */
 .notification{
   border-radius: 10px;
   border: 1px solid var(--apa-border);
 }
 
-/* Botón primario: mismo azul institucional */
+/* Botón primario */
 .button.is-primary{
   background-color: var(--apa-primary);
 }
@@ -129,7 +128,23 @@
   background-color: #163173;
 }
 
-/* Fix autofill (Chrome) en tema claro */
+/* ===== Botón ícono (ojo) más formal ===== */
+.apa-icon-btn{
+  min-width: 44px;
+  width: 44px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color: #334155;
+  border-color: var(--apa-border);
+}
+.apa-icon{
+  width: 18px;
+  height: 18px;
+  display:block;
+}
+
+/* Fix autofill (Chrome) */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
 input:-webkit-autofill:focus{
