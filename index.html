@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
 
   <!-- Tema -->
-  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-1" />
+  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-2" />
 </head>
 <body class="apa-body">
 
@@ -32,8 +32,8 @@
       <div class="columns is-centered">
         <div class="column is-8-tablet is-6-desktop is-5-widescreen">
           <div class="box apa-box apa-loginBox">
-            <h1 class="title is-5 mb-2">Ingreso al sistema</h1>
-            <p class="subtitle is-7 has-text-grey">Ingresa con el usuario creado en Firebase Authentication.</p>
+            <h1 class="title is-5 apa-h1">Ingreso al sistema</h1>
+            <p class="subtitle is-7 has-text-grey apa-sub">Ingresa con el usuario creado en Firebase Authentication.</p>
 
             <div class="columns is-multiline">
               <div class="column is-12">
@@ -48,7 +48,20 @@
                     <input id="loginPassword" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
                   </p>
                   <p class="control">
-                    <button id="btnTogglePassword" class="button is-light" type="button" aria-label="Mostrar/ocultar contraseña">👁️</button>
+                    <button
+                      id="btnTogglePassword"
+                      class="button is-light apa-icon-btn"
+                      type="button"
+                      aria-label="Mostrar/ocultar contraseña"
+                      title="Mostrar/ocultar contraseña">
+                      <span class="icon" aria-hidden="true">
+                        <!-- Eye icon (SVG corporativo) -->
+                        <svg class="apa-icon" viewBox="0 0 24 24" fill="none">
+                          <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                          <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
+                        </svg>
+                      </span>
+                    </button>
                   </p>
                 </div>
               </div>
@@ -74,3 +87,4 @@
   <script type="module" src="./login.js?v=20260119-3"></script>
 </body>
 </html>
+
