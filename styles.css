@@ -1,269 +1,139 @@
+/* ===========================
+   TEMA APA - Bulma Override
+   Formal + moderno (oficina)
+=========================== */
+
 :root{
-  /* ===== Paleta institucional ===== */
-  --bg:#f4f6f8;
-  --surface:#ffffff;
-  --surface-alt:#f9fafb;
-
-  --txt:#1f2937;
-  --muted:#6b7280;
-  --line:#d1d5db;
-
-  --primary:#1e3a8a;     /* azul institucional */
-  --primary-soft:#e0e7ff;
-
-  --ok:#166534;
-  --ok-bg:#dcfce7;
-
-  --warn:#92400e;
-  --warn-bg:#fef3c7;
-
-  --danger:#7f1d1d;
-  --danger-bg:#fee2e2;
+  --apa-primary:#1e3a8a;         /* azul institucional */
+  --apa-primary-2:#0b255f;
+  --apa-bg:#f3f5f7;
+  --apa-card:#ffffff;
+  --apa-border:#d7dde5;
+  --apa-text:#1f2937;
+  --apa-muted:#6b7280;
 }
 
-*{
-  box-sizing:border-box;
+.apa-body{
+  background: var(--apa-bg);
+  color: var(--apa-text);
 }
 
-html,body{
-  margin:0;
-  height:100%;
+/* NAVBAR */
+.apa-navbar{
+  background: linear-gradient(180deg, var(--apa-primary), var(--apa-primary-2));
+  box-shadow: 0 2px 18px rgba(16,24,40,.18);
 }
 
-body{
-  font-family: "Segoe UI", Roboto, Arial, sans-serif;
-  background:var(--bg);
-  color:var(--txt);
-  font-size:14px;
-}
-
-/* ================= HEADER ================= */
-.topbar{
-  background:var(--primary);
-  color:white;
-  padding:14px 20px;
+.apa-brand{
   display:flex;
-  justify-content:space-between;
   align-items:center;
-}
-
-.brand{
-  display:flex;
   gap:12px;
-  align-items:center;
 }
 
-.badge{
+.apa-badge{
   width:42px;
   height:42px;
-  background:white;
-  color:var(--primary);
-  border-radius:8px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:800;
-}
-
-.brand-title{
-  font-size:15px;
-  font-weight:700;
-}
-
-.brand-sub{
-  font-size:12px;
-  opacity:.85;
-}
-
-.userbox{
-  display:flex;
-  align-items:center;
-  gap:14px;
-}
-
-.usertext{
-  text-align:right;
-  font-size:12px;
-}
-
-/* ================= CONTENEDOR ================= */
-.container{
-  max-width:1200px;
-  margin:20px auto;
-  padding:0 16px;
-}
-
-/* ================= CARDS ================= */
-.card{
-  background:var(--surface);
-  border:1px solid var(--line);
-  border-radius:6px;
-  padding:18px;
-}
-
-.card.inner{
-  background:var(--surface-alt);
-}
-
-/* ================= TABS ================= */
-.tabs{
-  display:flex;
-  gap:6px;
-  flex-wrap:wrap;
-  margin-bottom:12px;
-}
-
-.tab{
-  background:var(--surface);
-  border:1px solid var(--line);
-  padding:8px 14px;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:13px;
-}
-
-.tab.active{
-  background:var(--primary);
-  color:white;
-  border-color:var(--primary);
-}
-
-/* ================= FORMULARIOS ================= */
-label{
-  font-size:12px;
-  color:var(--muted);
-  margin-bottom:4px;
-  display:block;
-}
-
-input, select, textarea{
-  width:100%;
-  padding:8px 10px;
-  border:1px solid var(--line);
-  border-radius:4px;
-  font-size:13px;
-  background:white;
-}
-
-input:focus, select:focus, textarea:focus{
-  outline:none;
-  border-color:var(--primary);
-}
-
-/* ================= BOTONES ================= */
-.btn{
-  background:var(--primary);
-  color:white;
-  border:none;
-  padding:8px 14px;
-  border-radius:4px;
-  cursor:pointer;
-  font-size:13px;
-}
-
-.btn--ghost{
-  background:white;
-  color:var(--primary);
-  border:1px solid var(--line);
-}
-
-.btn--danger{
-  background:var(--danger);
-  color:white;
-}
-
-/* ================= MENSAJES ================= */
-.msg{
-  margin-top:12px;
-  padding:10px 12px;
-  border-radius:4px;
-  font-size:13px;
-  border:1px solid var(--line);
-  background:#f9fafb;
-}
-
-.msg.ok{
-  background:var(--ok-bg);
-  border-color:var(--ok);
-  color:var(--ok);
-}
-
-.msg.warn{
-  background:var(--warn-bg);
-  border-color:var(--warn);
-  color:var(--warn);
-}
-
-.msg.bad{
-  background:var(--danger-bg);
-  border-color:var(--danger);
-  color:var(--danger);
-}
-
-/* ================= TABLAS ================= */
-.table-wrap{
-  margin-top:12px;
-  overflow-x:auto;
-  border:1px solid var(--line);
-  border-radius:4px;
-}
-
-.table{
-  width:100%;
-  border-collapse:collapse;
-  min-width:900px;
-}
-
-.table th{
-  background:#f3f4f6;
-  font-size:12px;
-  text-align:left;
-  padding:10px;
-  border-bottom:1px solid var(--line);
-}
-
-.table td{
-  padding:10px;
-  font-size:13px;
-  border-bottom:1px solid var(--line);
-}
-
-.table tr:hover td{
-  background:#f9fafb;
-}
-
-.right{
-  text-align:right;
-}
-
-/* ================= KPI ================= */
-.kpis{
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:12px;
-  margin-bottom:14px;
+  place-items:center;
+  background:#fff;
+  color: var(--apa-primary);
+  border-radius:10px;
+  font-weight:900;
+  letter-spacing:.5px;
 }
 
-.kpi{
-  background:var(--surface-alt);
-  border:1px solid var(--line);
-  padding:12px;
-  border-radius:4px;
+.apa-title{
+  color:#fff;
+  font-weight:800;
+  line-height:1.1;
 }
 
-.kpiVal{
-  font-size:20px;
-  font-weight:700;
-  margin-top:6px;
-}
-
-/* ================= FOOTER ================= */
-.footer{
-  margin-top:20px;
-  padding:12px;
+.apa-subtitle{
+  color: rgba(255,255,255,.82);
   font-size:12px;
-  text-align:center;
-  color:var(--muted);
 }
 
+.apa-userbox{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
 
+.apa-usertext{
+  text-align:right;
+}
+
+/* SECTION spacing */
+.apa-section{
+  padding-top: 18px;
+}
+
+/* BOX estilo “sistema corporativo” */
+.apa-box{
+  background: var(--apa-card);
+  border: 1px solid var(--apa-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(16,24,40,.08);
+}
+
+.apa-boxInner{
+  border-radius: 10px;
+  border: 1px solid var(--apa-border);
+  box-shadow: none;
+}
+
+/* KPI */
+.apa-kpi{
+  border: 1px solid var(--apa-border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fbfcfe;
+}
+
+.apa-kpiVal{
+  font-size: 22px;
+  font-weight: 900;
+  margin-top: 6px;
+  color: var(--apa-primary);
+}
+
+/* Tabs más “enterprise” */
+.apa-tabs .tab{
+  font-weight:700;
+}
+
+/* Tab activo: tu JS agrega .active al elemento .tab, pero Bulma usa li.is-active.
+   Entonces hacemos que se vea bien igual. */
+.tab.active{
+  color:#fff !important;
+}
+
+/* Tablas: un poquito más “SAP/ERP” */
+.apa-tableWrap{
+  border: 1px solid var(--apa-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* Notificaciones: que se vean discretas */
+.notification{
+  border-radius: 10px;
+  border: 1px solid var(--apa-border);
+}
+
+/* Botón primario: mismo azul institucional */
+.button.is-primary{
+  background-color: var(--apa-primary);
+}
+.button.is-primary:hover{
+  background-color: #163173;
+}
+
+/* Fix autofill (Chrome) en tema claro */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus{
+  -webkit-box-shadow: 0 0 0px 1000px #ffffff inset !important;
+  -webkit-text-fill-color: var(--apa-text) !important;
+  caret-color: var(--apa-text);
+}
