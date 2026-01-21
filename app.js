@@ -233,7 +233,10 @@ function setupPasswordToggles() {
     if (!input || !btn) return;
     const isPwd = input.type === "password";
     input.type = isPwd ? "text" : "password";
-    btn.textContent = isPwd ? "🙈" : "👁️";
+    btn.setAttribute("aria-label", isPwd ? "Ocultar contraseña" : "Mostrar contraseña");
+btn.setAttribute("title", isPwd ? "Ocultar contraseña" : "Mostrar contraseña");
+// NO tocar el contenido del botón (para no pisar el SVG)
+
   });
 }
 
@@ -1496,4 +1499,5 @@ on("reportMode", "change", () => {
   // Asegurar que reqType tenga "Solicitud"
   ensureRequestTypeHasSolicitud();
 })();
+
 
