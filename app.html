@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
 
   <!-- Tu tema institucional (override) -->
-  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-1" />
+  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-2" />
 </head>
 <body class="apa-body">
 
@@ -606,7 +606,19 @@
                           <input id="empPass" class="input" type="password" />
                         </p>
                         <p class="control">
-                          <button id="btnToggleEmpPass" class="button is-light" type="button">👁️</button>
+                          <button
+                            id="btnToggleEmpPass"
+                            class="button is-light apa-icon-btn"
+                            type="button"
+                            aria-label="Mostrar/ocultar contraseña"
+                            title="Mostrar/ocultar contraseña">
+                            <span class="icon" aria-hidden="true">
+                              <svg class="apa-icon" viewBox="0 0 24 24" fill="none">
+                                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                                <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
+                              </svg>
+                            </span>
+                          </button>
                         </p>
                       </div>
                     </div>
