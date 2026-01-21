@@ -5,86 +5,67 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>APA • Login</title>
 
-  <!-- Bulma -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <!-- Fuente moderna, formal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Tema -->
-  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-2" />
+  <link rel="stylesheet" href="./styles.css?v=20260121-fix-1" />
 </head>
-<body class="apa-body">
+<body>
 
-  <nav class="navbar apa-navbar" role="navigation" aria-label="main navigation">
-    <div class="navbar-brand">
-      <div class="navbar-item">
-        <div class="apa-brand">
-          <div class="apa-badge">APA</div>
-          <div>
-            <div class="apa-title">Sistema de Registros</div>
-            <div class="apa-subtitle">Depto. Personal • Acceso</div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="badge">APA</div>
+      <div>
+        <div class="brand-title">Sistema de Registros</div>
+        <div class="brand-sub">Depto. Personal • Acceso</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="container login-page">
+    <section class="card login-card">
+      <h1 class="login-h1">Ingreso al sistema</h1>
+      <p class="muted login-sub">Ingresa con el usuario creado en Firebase Authentication.</p>
+
+      <div class="grid2">
+        <div>
+          <label>Correo</label>
+          <input id="loginEmail" type="email" placeholder="correo@dominio.com" autocomplete="username" />
+        </div>
+
+        <div>
+          <label>Contraseña</label>
+          <div class="password-wrap">
+            <input id="loginPassword" type="password" placeholder="••••••••" autocomplete="current-password" />
+            <button id="btnTogglePassword"
+              class="btn btn--ghost btn-eye"
+              type="button"
+              aria-label="Mostrar/ocultar contraseña"
+              title="Mostrar/ocultar contraseña">
+
+              <!-- Ícono formal (SVG) -->
+              <svg class="icon-eye" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
+              </svg>
+            </button>
           </div>
         </div>
       </div>
-    </div>
-  </nav>
 
-  <section class="section apa-section">
-    <div class="container">
-      <div class="columns is-centered">
-        <div class="column is-8-tablet is-6-desktop is-5-widescreen">
-          <div class="box apa-box apa-loginBox">
-            <h1 class="title is-5 apa-h1">Ingreso al sistema</h1>
-            <p class="subtitle is-7 has-text-grey apa-sub">Ingresa con el usuario creado en Firebase Authentication.</p>
-
-            <div class="columns is-multiline">
-              <div class="column is-12">
-                <label class="label is-small">Correo</label>
-                <input id="loginEmail" class="input" type="email" placeholder="correo@dominio.com" autocomplete="username" />
-              </div>
-
-              <div class="column is-12">
-                <label class="label is-small">Contraseña</label>
-                <div class="field has-addons">
-                  <p class="control is-expanded">
-                    <input id="loginPassword" class="input" type="password" placeholder="••••••••" autocomplete="current-password" />
-                  </p>
-                  <p class="control">
-                    <button
-                      id="btnTogglePassword"
-                      class="button is-light apa-icon-btn"
-                      type="button"
-                      aria-label="Mostrar/ocultar contraseña"
-                      title="Mostrar/ocultar contraseña">
-                      <span class="icon" aria-hidden="true">
-                        <!-- Eye icon (SVG corporativo) -->
-                        <svg class="apa-icon" viewBox="0 0 24 24" fill="none">
-                          <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                          <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
-                        </svg>
-                      </span>
-                    </button>
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="buttons mt-2">
-              <button id="btnLogin" class="button is-primary is-fullwidth">Ingresar</button>
-            </div>
-
-            <p class="help has-text-grey">Tip: revisa Firebase → Authentication → Users</p>
-
-            <div id="loginMsg" class="notification is-light mt-3">Ingresa tus credenciales para continuar.</div>
-          </div>
-
-          <p class="has-text-grey is-size-7 has-text-centered mt-3">
-            Acceso restringido • Uso interno
-          </p>
-        </div>
+      <div class="row">
+        <button id="btnLogin" class="btn btn--primary">Ingresar</button>
+        <div class="muted small">Tip: revisa Firebase → Authentication → Users</div>
       </div>
-    </div>
-  </section>
 
-  <script type="module" src="./login.js?v=20260119-3"></script>
+      <div id="loginMsg" class="msg info">Ingresa tus credenciales para continuar.</div>
+
+      <div class="login-foot muted small">Acceso restringido • Uso interno</div>
+    </section>
+  </main>
+
+  <script type="module" src="./login.js?v=20260121-fix-1"></script>
 </body>
 </html>
-
