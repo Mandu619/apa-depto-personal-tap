@@ -21,7 +21,10 @@ function setupToggle() {
   btn.addEventListener("click", () => {
     const isPwd = input.type === "password";
     input.type = isPwd ? "text" : "password";
-    btn.textContent = isPwd ? "🙈" : "👁️";
+
+    // Importante: NO cambiar textContent (si no, pisa el SVG)
+    btn.setAttribute("aria-label", isPwd ? "Ocultar contraseña" : "Mostrar contraseña");
+    btn.setAttribute("title", isPwd ? "Ocultar contraseña" : "Mostrar contraseña");
   });
 }
 
@@ -41,7 +44,6 @@ $("btnLogin")?.addEventListener("click", async () => {
   try {
     await signInWithEmailAndPassword(auth, email, password);
     setMsg(msg, "✅ Ingreso exitoso. Redirigiendo...", "ok");
-    // Redirección inmediata al panel
     window.location.href = "./app.html";
   } catch (err) {
     console.error(err);
