@@ -5,678 +5,468 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>APA • Sistema</title>
 
-  <!-- Bulma (framework moderno y formal) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+  <!-- Fuente moderna, formal -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- Tu tema institucional (override) -->
-  <link rel="stylesheet" href="./styles.css?v=20260121-bulma-2" />
+  <link rel="stylesheet" href="./styles.css?v=20260121-fix-1" />
 </head>
-<body class="apa-body">
+<body>
 
-  <!-- Navbar institucional -->
-  <nav class="navbar apa-navbar" role="navigation" aria-label="main navigation">
-    <div class="navbar-brand">
-      <div class="navbar-item">
-        <div class="apa-brand">
-          <div class="apa-badge">APA</div>
-          <div>
-            <div class="apa-title">Sistema de Registros</div>
-            <div class="apa-subtitle">Depto. Personal • Entradas • Asignaciones • Merma • Solicitudes • Informes</div>
-          </div>
-        </div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="badge">APA</div>
+      <div>
+        <div class="brand-title">Sistema de Registros</div>
+        <div class="brand-sub">Depto. Personal • Entradas • Asignaciones • Merma • Solicitudes • Informes</div>
       </div>
     </div>
 
-    <div class="navbar-menu is-active">
-      <div class="navbar-end">
-        <div class="navbar-item">
-          <div class="apa-userbox">
-            <div class="apa-usertext">
-              <div id="userName" class="has-text-weight-semibold">Cargando…</div>
-              <div id="userRole" class="is-size-7 has-text-grey-light">Rol: —</div>
-            </div>
-            <button id="btnLogout" class="button is-light is-small">Salir</button>
-          </div>
-        </div>
+    <div class="userbox">
+      <div class="usertext">
+        <div id="userName">Cargando…</div>
+        <div id="userRole" class="muted small">Rol: —</div>
       </div>
+      <button id="btnLogout" class="btn btn--ghost">Salir</button>
     </div>
-  </nav>
+  </header>
 
-  <section class="section apa-section">
-    <div class="container is-widescreen">
+  <main class="container app-page">
 
-      <!-- Tabs (Bulma) - mantenemos class="tab" para tu JS -->
-      <div id="navTabs" class="tabs is-toggle is-toggle-rounded is-small apa-tabs">
-        <ul>
-          <li class="is-active"><a class="tab" data-view="view-dashboard">Panel</a></li>
-          <li><a class="tab" data-view="view-entries">Entradas</a></li>
-          <li><a class="tab" data-view="view-assign">Asignación</a></li>
-          <li><a class="tab" data-view="view-scrap">Merma</a></li>
-          <li><a class="tab" data-view="view-requests">Solicitudes</a></li>
-          <li><a class="tab" data-view="view-reports">Informes</a></li>
-          <li><a class="tab" data-view="view-employees" id="tabEmployees">Empleados</a></li>
-          <li><a class="tab" data-view="view-admin" id="tabAdmin">Admin</a></li>
-        </ul>
-      </div>
+    <!-- Tabs -->
+    <nav id="navTabs" class="tabs">
+      <button class="tab active" data-view="view-dashboard">Panel</button>
+      <button class="tab" data-view="view-entries">Entradas</button>
+      <button class="tab" data-view="view-assign">Asignación</button>
+      <button class="tab" data-view="view-scrap">Merma</button>
+      <button class="tab" data-view="view-requests">Solicitudes</button>
+      <button class="tab" data-view="view-reports">Informes</button>
+      <button class="tab" data-view="view-employees" id="tabEmployees">Empleados</button>
+      <button class="tab" data-view="view-admin" id="tabAdmin">Admin</button>
+    </nav>
 
-      <!-- Vistas -->
-      <section id="appShell" class="app">
+    <!-- Vistas -->
+    <section id="appShell" class="app">
 
-        <!-- DASHBOARD -->
-        <section id="view-dashboard" class="view">
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Panel</h1>
-                  <p class="subtitle is-7 has-text-grey">Resumen operacional (últimos movimientos)</p>
-                </div>
-              </div>
-            </div>
+      <!-- DASHBOARD -->
+      <section id="view-dashboard" class="view">
+        <div class="card">
+          <h2>Panel</h2>
 
-            <div class="columns is-multiline">
-              <div class="column is-3">
-                <div class="apa-kpi">
-                  <div class="is-size-7 has-text-grey">Entradas (últimos 30 días)</div>
-                  <div id="kpiEntries" class="apa-kpiVal">0</div>
-                </div>
-              </div>
-              <div class="column is-3">
-                <div class="apa-kpi">
-                  <div class="is-size-7 has-text-grey">Asignaciones (últimos 30 días)</div>
-                  <div id="kpiAssignments" class="apa-kpiVal">0</div>
-                </div>
-              </div>
-              <div class="column is-3">
-                <div class="apa-kpi">
-                  <div class="is-size-7 has-text-grey">Mermas (últimos 30 días)</div>
-                  <div id="kpiScrap" class="apa-kpiVal">0</div>
-                </div>
-              </div>
-              <div class="column is-3">
-                <div class="apa-kpi">
-                  <div class="is-size-7 has-text-grey">Solicitudes pendientes</div>
-                  <div id="kpiPending" class="apa-kpiVal">0</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="columns">
-              <div class="column">
-                <h2 class="title is-6">Últimas entradas</h2>
-                <div class="table-container apa-tableWrap">
-                  <table id="tblLastEntries" class="table is-fullwidth is-hoverable is-striped">
-                    <thead>
-                      <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="has-text-right">Cant.</th><th class="has-text-right">Disp.</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-              </div>
-
-              <div class="column">
-                <h2 class="title is-6">Últimas asignaciones</h2>
-                <div class="table-container apa-tableWrap">
-                  <table id="tblLastAssignments" class="table is-fullwidth is-hoverable is-striped">
-                    <thead>
-                      <tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="has-text-right">Cant.</th></tr>
-                    </thead>
-                    <tbody></tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            <article id="dashMsg" class="message is-success is-light mt-4">
-              <div class="message-body">Panel actualizado.</div>
-            </article>
+          <div class="kpis">
+            <div class="kpi"><div class="muted small">Entradas (últimos 30 días)</div><div id="kpiEntries" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Asignaciones (últimos 30 días)</div><div id="kpiAssignments" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Mermas (últimos 30 días)</div><div id="kpiScrap" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Solicitudes pendientes</div><div id="kpiPending" class="kpiVal">0</div></div>
           </div>
-        </section>
 
-        <!-- ENTRADAS -->
-        <section id="view-entries" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Entradas</h1>
-                  <p class="subtitle is-7 has-text-grey">Registro de inventario / recepción</p>
-                </div>
+          <div class="grid2">
+            <div>
+              <h3>Últimas entradas</h3>
+              <div class="table-wrap">
+                <table id="tblLastEntries" class="table">
+                  <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th class="right">Disp.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
               </div>
             </div>
 
-            <form id="formEntry" class="form">
-              <div class="columns is-multiline">
-                <div class="column is-4">
-                  <label class="label is-small">Fecha</label>
-                  <input id="entryDate" class="input" type="date" />
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Tipo</label>
-                  <div class="select is-fullwidth">
-                    <select id="entryType">
-                      <option value="">Seleccionar…</option>
-                      <option>EPP</option>
-                      <option>Uniforme</option>
-                      <option>Documentación</option>
-                      <option>Insumo</option>
-                      <option>Otro</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Cantidad</label>
-                  <input id="entryQty" class="input" type="number" min="1" />
-                </div>
-
-                <div class="column is-6">
-                  <label class="label is-small">Descripción</label>
-                  <input id="entryDesc" class="input" type="text" />
-                </div>
-                <div class="column is-6">
-                  <label class="label is-small">Referencia / N° Doc</label>
-                  <input id="entryRef" class="input" type="text" />
-                </div>
+            <div>
+              <h3>Últimas asignaciones</h3>
+              <div class="table-wrap">
+                <table id="tblLastAssignments" class="table">
+                  <thead><tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th></tr></thead>
+                  <tbody></tbody>
+                </table>
               </div>
-
-              <div class="buttons">
-                <button class="button is-primary" type="submit">Guardar entrada</button>
-                <button class="button is-light" type="button" id="btnReloadEntries">Actualizar</button>
-              </div>
-            </form>
-
-            <div id="entryMsg" class="notification is-light mt-3">—</div>
-
-            <div class="columns is-multiline mt-2">
-              <div class="column is-4">
-                <div class="select is-fullwidth">
-                  <select id="filterEntryType">
-                    <option value="">Todos los tipos</option>
-                    <option>EPP</option><option>Uniforme</option><option>Documentación</option><option>Insumo</option><option>Otro</option>
-                  </select>
-                </div>
-              </div>
-              <div class="column is-8">
-                <input id="filterEntryText" class="input" type="text" placeholder="Buscar texto…" />
-              </div>
-            </div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblEntries" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th class="has-text-right">Cant.</th><th class="has-text-right">Disp.</th><th>Registrado por</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
             </div>
           </div>
-        </section>
 
-        <!-- ASIGNACION -->
-        <section id="view-assign" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Asignación</h1>
-                  <p class="subtitle is-7 has-text-grey">Entrega de ítems a personal</p>
-                </div>
-              </div>
-            </div>
-
-            <form id="formAssign" class="form">
-              <div class="columns is-multiline">
-                <div class="column is-4">
-                  <label class="label is-small">Fecha</label>
-                  <input id="assignDate" class="input" type="date" />
-                </div>
-
-                <div class="column is-4">
-                  <label class="label is-small">Trabajador (desde BD)</label>
-                  <div class="select is-fullwidth">
-                    <select id="assignWorkerSelect"></select>
-                  </div>
-                  <p class="help">Solo usuarios registrados (empleados) pueden recibir asignaciones.</p>
-                </div>
-
-                <div class="column is-4">
-                  <label class="label is-small">Cantidad</label>
-                  <input id="assignQty" class="input" type="number" min="1" />
-                </div>
-
-                <div class="column is-6">
-                  <label class="label is-small">Ítem (entrada)</label>
-                  <div class="select is-fullwidth">
-                    <select id="assignEntryId"></select>
-                  </div>
-                </div>
-
-                <div class="column is-6">
-                  <label class="label is-small">Motivo</label>
-                  <input id="assignReason" class="input" type="text" placeholder="Ej: Entrega EPP" />
-                </div>
-              </div>
-
-              <div class="buttons">
-                <button class="button is-primary" type="submit">Guardar asignación</button>
-                <button class="button is-light" type="button" id="btnReloadAssignments">Actualizar</button>
-              </div>
-            </form>
-
-            <div id="assignMsg" class="notification is-light mt-3">—</div>
-
-            <div class="columns is-multiline mt-2">
-              <div class="column is-4">
-                <input id="filterAssignWorker" class="input" type="text" placeholder="Filtrar trabajador…" />
-              </div>
-              <div class="column is-4">
-                <input id="filterAssignFrom" class="input" type="date" />
-              </div>
-              <div class="column is-4">
-                <input id="filterAssignTo" class="input" type="date" />
-              </div>
-            </div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblAssignments" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="has-text-right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- MERMA -->
-        <section id="view-scrap" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Merma</h1>
-                  <p class="subtitle is-7 has-text-grey">Control de pérdidas / vencimientos / daños</p>
-                </div>
-              </div>
-            </div>
-
-            <form id="formScrap" class="form">
-              <div class="columns is-multiline">
-                <div class="column is-4">
-                  <label class="label is-small">Fecha</label>
-                  <input id="scrapDate" class="input" type="date" />
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Ítem (entrada)</label>
-                  <div class="select is-fullwidth">
-                    <select id="scrapEntryId"></select>
-                  </div>
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Cantidad</label>
-                  <input id="scrapQty" class="input" type="number" min="1" />
-                </div>
-
-                <div class="column is-6">
-                  <label class="label is-small">Motivo</label>
-                  <div class="select is-fullwidth">
-                    <select id="scrapReason">
-                      <option value="">Seleccionar…</option>
-                      <option>Vencimiento</option>
-                      <option>Daño</option>
-                      <option>Pérdida</option>
-                      <option>Otro</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="column is-6">
-                  <label class="label is-small">Detalle (si “Otro”)</label>
-                  <input id="scrapDetail" class="input" type="text" />
-                </div>
-              </div>
-
-              <div class="buttons">
-                <button class="button is-primary" type="submit">Registrar merma</button>
-              </div>
-            </form>
-
-            <div id="scrapMsg" class="notification is-light mt-3">—</div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblScrap" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr><th>Fecha</th><th>Ítem</th><th>Tipo</th><th>Descripción</th><th class="has-text-right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- SOLICITUDES -->
-        <section id="view-requests" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Solicitudes</h1>
-                  <p class="subtitle is-7 has-text-grey">Canal de soporte interno</p>
-                </div>
-              </div>
-            </div>
-
-            <form id="formRequest" class="form">
-              <div class="columns is-multiline">
-                <div class="column is-4">
-                  <label class="label is-small">Tipo</label>
-                  <div class="select is-fullwidth">
-                    <select id="reqType">
-                      <option value="">Seleccionar…</option>
-                      <option>Incidente</option>
-                      <option>Requerimiento</option>
-                      <option>Solicitud</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Prioridad</label>
-                  <div class="select is-fullwidth">
-                    <select id="reqPriority">
-                      <option>Normal</option>
-                      <option>Alta</option>
-                    </select>
-                  </div>
-                </div>
-                <div class="column is-4">
-                  <label class="label is-small">Detalle</label>
-                  <input id="reqText" class="input" type="text" placeholder="Describe la solicitud…" />
-                </div>
-              </div>
-
-              <div class="buttons">
-                <button class="button is-primary" type="submit">Crear</button>
-                <button class="button is-light" type="button" id="btnReloadRequests">Actualizar</button>
-              </div>
-            </form>
-
-            <div id="reqMsg" class="notification is-light mt-3">—</div>
-
-            <div class="columns is-multiline mt-2">
-              <div class="column is-4">
-                <div class="select is-fullwidth">
-                  <select id="filterReqStatus">
-                    <option value="">Todos</option>
-                    <option>Pendiente</option>
-                    <option>Respondida</option>
-                  </select>
-                </div>
-              </div>
-              <div class="column is-8">
-                <input id="filterReqText" class="input" type="text" placeholder="Buscar…" />
-              </div>
-            </div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblRequests" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Tipo</th>
-                    <th>Solicitante</th>
-                    <th>Detalle</th>
-                    <th>Prioridad</th>
-                    <th>Estado</th>
-                    <th>Respuesta</th>
-                    <th>Acción</th>
-                  </tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- INFORMES -->
-        <section id="view-reports" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Informes</h1>
-                  <p class="subtitle is-7 has-text-grey">Consolidación y exportación</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="columns is-multiline">
-              <div class="column is-4">
-                <label class="label is-small">Tipo de informe</label>
-                <div class="select is-fullwidth">
-                  <select id="reportMode">
-                    <option value="assign_worker">Asignaciones (por trabajador)</option>
-                    <option value="mov_type">Movimientos (por tipo: asignación + merma)</option>
-                    <option value="stock">Stock actual (entradas y disponible)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="column is-4">
-                <label class="label is-small">Filtro principal</label>
-                <div class="select is-fullwidth">
-                  <select id="reportPrimarySelect"></select>
-                </div>
-                <p class="help">Opcional: filtro texto (busca en descripción / motivo)</p>
-                <input id="reportFilter" class="input" type="text" placeholder="Ej: Maritza / tenida / vencimiento" />
-              </div>
-
-              <div class="column is-4">
-                <label class="label is-small">Rango fechas</label>
-                <div class="field is-grouped">
-                  <p class="control is-expanded">
-                    <input id="reportFrom" class="input" type="date" />
-                  </p>
-                  <p class="control is-expanded">
-                    <input id="reportTo" class="input" type="date" />
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div class="buttons">
-              <button id="btnRunReport" class="button is-primary">Generar</button>
-              <button id="btnExportCSV" class="button is-light" disabled>Exportar CSV</button>
-            </div>
-
-            <div class="columns is-multiline mt-2">
-              <div class="column is-3"><div class="apa-kpi"><div class="is-size-7 has-text-grey">Registros</div><div id="reportCount" class="apa-kpiVal">0</div></div></div>
-              <div class="column is-3"><div class="apa-kpi"><div class="is-size-7 has-text-grey">Total cantidades</div><div id="reportQty" class="apa-kpiVal">0</div></div></div>
-              <div class="column is-3"><div class="apa-kpi"><div class="is-size-7 has-text-grey">Total merma</div><div id="reportScrapTotal" class="apa-kpiVal">0</div></div></div>
-              <div class="column is-3"><div class="apa-kpi"><div class="is-size-7 has-text-grey">Stock total restante</div><div id="reportRemainingTotal" class="apa-kpiVal">0</div></div></div>
-            </div>
-
-            <div id="reportMsg" class="notification is-light mt-3">—</div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblReport" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>Ítem/ID</th><th>Descripción</th><th class="has-text-right">Cant.</th><th>Motivo</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- ADMIN -->
-        <section id="view-admin" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Admin (Corrección de BD)</h1>
-                  <p class="subtitle is-7 has-text-grey">Borrados/correcciones (solo admin)</p>
-                </div>
-              </div>
-            </div>
-
-            <article class="message is-warning is-light">
-              <div class="message-body">
-                Herramientas para eliminar registros ingresados por error (solo admin). Al borrar una asignación o merma, el stock se devuelve automáticamente.
-              </div>
-            </article>
-
-            <div class="columns is-multiline">
-              <div class="column is-4">
-                <label class="label is-small">Entidad</label>
-                <div class="select is-fullwidth">
-                  <select id="adminEntity">
-                    <option value="assignments">Asignaciones</option>
-                    <option value="scrap">Mermas</option>
-                    <option value="entries">Entradas</option>
-                    <option value="requests">Solicitudes</option>
-                    <option value="employees">Trabajadores</option>
-                  </select>
-                </div>
-              </div>
-              <div class="column is-4">
-                <label class="label is-small">Ver últimos</label>
-                <div class="select is-fullwidth">
-                  <select id="adminLimit">
-                    <option value="25">25</option>
-                    <option value="50" selected>50</option>
-                    <option value="100">100</option>
-                  </select>
-                </div>
-              </div>
-              <div class="column is-4 is-flex is-align-items-flex-end">
-                <button id="btnAdminLoad" class="button is-primary">Cargar</button>
-              </div>
-            </div>
-
-            <div id="adminMsg" class="notification is-light mt-3">—</div>
-
-            <div class="table-container apa-tableWrap">
-              <table id="tblAdmin" class="table is-fullwidth is-hoverable">
-                <thead>
-                  <tr><th>Fecha</th><th>Detalle</th><th class="has-text-right">Cant.</th><th>Acción</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
-        </section>
-
-        <!-- EMPLEADOS -->
-        <section id="view-employees" class="view" hidden>
-          <div class="box apa-box">
-            <div class="level mb-3">
-              <div class="level-left">
-                <div>
-                  <h1 class="title is-5 mb-1">Empleados (Admin)</h1>
-                  <p class="subtitle is-7 has-text-grey">Gestión de usuarios internos</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="columns">
-              <div class="column">
-                <div class="box apa-boxInner">
-                  <h2 class="title is-6">Crear empleado</h2>
-
-                  <div class="columns is-multiline">
-                    <div class="column is-6">
-                      <label class="label is-small">Nombres</label>
-                      <input id="empFirst" class="input" type="text" />
-                    </div>
-                    <div class="column is-6">
-                      <label class="label is-small">Apellidos</label>
-                      <input id="empLast" class="input" type="text" />
-                    </div>
-
-                    <div class="column is-6">
-                      <label class="label is-small">Correo</label>
-                      <input id="empEmail" class="input" type="email" />
-                    </div>
-
-                    <div class="column is-6">
-                      <label class="label is-small">Clave</label>
-                      <div class="field has-addons">
-                        <p class="control is-expanded">
-                          <input id="empPass" class="input" type="password" />
-                        </p>
-                        <p class="control">
-                          <button
-                            id="btnToggleEmpPass"
-                            class="button is-light apa-icon-btn"
-                            type="button"
-                            aria-label="Mostrar/ocultar contraseña"
-                            title="Mostrar/ocultar contraseña">
-                            <span class="icon" aria-hidden="true">
-                              <svg class="apa-icon" viewBox="0 0 24 24" fill="none">
-                                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
-                                <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
-                              </svg>
-                            </span>
-                          </button>
-                        </p>
-                      </div>
-                    </div>
-
-                    <div class="column is-6">
-                      <label class="label is-small">Rol</label>
-                      <div class="select is-fullwidth">
-                        <select id="empRole">
-                          <option value="admin">admin</option>
-                          <option value="operator">operator</option>
-                          <option value="consulta">consulta</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div class="column is-6">
-                      <label class="label is-small">Activo</label>
-                      <div class="select is-fullwidth">
-                        <select id="empActive">
-                          <option value="true">Sí</option>
-                          <option value="false">No</option>
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div class="buttons">
-                    <button id="btnCreateEmployee" class="button is-primary">Crear</button>
-                    <button id="btnReloadEmployees" class="button is-light" type="button">Actualizar</button>
-                  </div>
-
-                  <div id="empMsg" class="notification is-light mt-3">—</div>
-                </div>
-              </div>
-
-              <div class="column">
-                <div class="box apa-boxInner">
-                  <h2 class="title is-6">Lista empleados</h2>
-                  <div class="table-container apa-tableWrap">
-                    <table id="tblEmployees" class="table is-fullwidth is-hoverable">
-                      <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th></tr></thead>
-                      <tbody></tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <p class="has-text-grey is-size-7 has-text-centered mt-4">
-              MVP académico • APA • Firebase Auth + Firestore • Roles: admin/operator/consulta
-            </p>
-          </div>
-        </section>
-
+          <div id="dashMsg" class="msg ok" style="margin-top:14px;">Panel actualizado.</div>
+        </div>
       </section>
-    </div>
-  </section>
 
-  <script type="module" src="./app.js?v=20260119-2"></script>
+      <!-- ENTRADAS -->
+      <section id="view-entries" class="view" hidden>
+        <div class="card">
+          <h2>Entradas</h2>
+
+          <form id="formEntry" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="entryDate" type="date" /></div>
+              <div>
+                <label>Tipo</label>
+                <select id="entryType">
+                  <option value="">Seleccionar…</option>
+                  <option>EPP</option>
+                  <option>Uniforme</option>
+                  <option>Documentación</option>
+                  <option>Insumo</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div><label>Cantidad</label><input id="entryQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div><label>Descripción</label><input id="entryDesc" type="text" /></div>
+              <div><label>Referencia / N° Doc</label><input id="entryRef" type="text" /></div>
+            </div>
+
+            <div class="row row--wrap">
+              <button class="btn btn--primary" type="submit">Guardar entrada</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadEntries">Actualizar</button>
+            </div>
+          </form>
+
+          <div id="entryMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <select id="filterEntryType">
+              <option value="">Todos los tipos</option>
+              <option>EPP</option><option>Uniforme</option><option>Documentación</option><option>Insumo</option><option>Otro</option>
+            </select>
+            <input id="filterEntryText" type="text" placeholder="Buscar texto…" />
+          </div>
+
+          <div class="table-wrap">
+            <table id="tblEntries" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Ref</th><th class="right">Cant.</th><th class="right">Disp.</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ASIGNACION -->
+      <section id="view-assign" class="view" hidden>
+        <div class="card">
+          <h2>Asignación</h2>
+
+          <form id="formAssign" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="assignDate" type="date" /></div>
+              <div>
+                <label>Trabajador (desde BD)</label>
+                <select id="assignWorkerSelect"></select>
+                <div class="muted small">Solo usuarios registrados (empleados) pueden recibir asignaciones.</div>
+              </div>
+              <div><label>Cantidad</label><input id="assignQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label>Ítem (entrada)</label>
+                <select id="assignEntryId"></select>
+              </div>
+              <div><label>Motivo</label><input id="assignReason" type="text" placeholder="Ej: Entrega EPP" /></div>
+            </div>
+
+            <div class="row row--wrap">
+              <button class="btn btn--primary" type="submit">Guardar asignación</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadAssignments">Actualizar</button>
+            </div>
+          </form>
+
+          <div id="assignMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <input id="filterAssignWorker" type="text" placeholder="Filtrar trabajador…" />
+            <input id="filterAssignFrom" type="date" />
+            <input id="filterAssignTo" type="date" />
+          </div>
+
+          <div class="table-wrap">
+            <table id="tblAssignments" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Trabajador</th><th>Ítem</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- MERMA -->
+      <section id="view-scrap" class="view" hidden>
+        <div class="card">
+          <h2>Merma</h2>
+
+          <form id="formScrap" class="form">
+            <div class="grid3">
+              <div><label>Fecha</label><input id="scrapDate" type="date" /></div>
+              <div>
+                <label>Ítem (entrada)</label>
+                <select id="scrapEntryId"></select>
+              </div>
+              <div><label>Cantidad</label><input id="scrapQty" type="number" min="1" /></div>
+            </div>
+
+            <div class="grid2">
+              <div>
+                <label>Motivo</label>
+                <select id="scrapReason">
+                  <option value="">Seleccionar…</option>
+                  <option>Vencimiento</option>
+                  <option>Daño</option>
+                  <option>Pérdida</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div><label>Detalle (si “Otro”)</label><input id="scrapDetail" type="text" /></div>
+            </div>
+
+            <div class="row row--wrap">
+              <button class="btn btn--primary" type="submit">Registrar merma</button>
+            </div>
+          </form>
+
+          <div id="scrapMsg" class="msg info">—</div>
+
+          <div class="table-wrap">
+            <table id="tblScrap" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Ítem</th><th>Tipo</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th><th>Registrado por</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- SOLICITUDES -->
+      <section id="view-requests" class="view" hidden>
+        <div class="card">
+          <h2>Solicitudes</h2>
+
+          <form id="formRequest" class="form">
+            <div class="grid3">
+              <div>
+                <label>Tipo</label>
+                <select id="reqType">
+                  <option value="">Seleccionar…</option>
+                  <option>Incidente</option>
+                  <option>Requerimiento</option>
+                  <option>Solicitud</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Prioridad</label>
+                <select id="reqPriority">
+                  <option>Normal</option>
+                  <option>Alta</option>
+                </select>
+              </div>
+
+              <div>
+                <label>Detalle</label>
+                <input id="reqText" type="text" placeholder="Describe la solicitud…" />
+              </div>
+            </div>
+
+            <div class="row row--wrap">
+              <button class="btn btn--primary" type="submit">Crear</button>
+              <button class="btn btn--ghost" type="button" id="btnReloadRequests">Actualizar</button>
+            </div>
+          </form>
+
+          <div id="reqMsg" class="msg info">—</div>
+
+          <div class="filters">
+            <select id="filterReqStatus">
+              <option value="">Todos</option>
+              <option>Pendiente</option>
+              <option>Respondida</option>
+            </select>
+            <input id="filterReqText" type="text" placeholder="Buscar…" />
+          </div>
+
+          <div class="table-wrap">
+            <table id="tblRequests" class="table">
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Tipo</th><th>Solicitante</th><th>Detalle</th><th>Prioridad</th><th>Estado</th><th>Respuesta</th><th>Acción</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- INFORMES -->
+      <section id="view-reports" class="view" hidden>
+        <div class="card">
+          <h2>Informes</h2>
+
+          <div class="grid3">
+            <div>
+              <label>Tipo de informe</label>
+              <select id="reportMode">
+                <option value="assign_worker">Asignaciones (por trabajador)</option>
+                <option value="mov_type">Movimientos (por tipo: asignación + merma)</option>
+                <option value="stock">Stock actual (entradas y disponible)</option>
+              </select>
+            </div>
+
+            <div>
+              <label>Filtro principal</label>
+              <select id="reportPrimarySelect"></select>
+              <div class="muted small" style="margin-top:6px;">Opcional: filtro texto (busca en descripción / motivo)</div>
+              <input id="reportFilter" type="text" placeholder="Ej: Maritza / tenida / vencimiento" />
+            </div>
+
+            <div>
+              <label>Rango fechas</label>
+              <div class="grid2">
+                <input id="reportFrom" type="date" />
+                <input id="reportTo" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="row row--wrap">
+            <button id="btnRunReport" class="btn btn--primary" type="button">Generar</button>
+            <button id="btnExportCSV" class="btn btn--ghost" type="button" disabled>Exportar CSV</button>
+          </div>
+
+          <div class="kpis" style="margin-top:12px;">
+            <div class="kpi"><div class="muted small">Registros</div><div id="reportCount" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Total cantidades</div><div id="reportQty" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Total merma</div><div id="reportScrapTotal" class="kpiVal">0</div></div>
+            <div class="kpi"><div class="muted small">Stock total restante</div><div id="reportRemainingTotal" class="kpiVal">0</div></div>
+          </div>
+
+          <div id="reportMsg" class="msg info">—</div>
+
+          <div class="table-wrap">
+            <table id="tblReport" class="table">
+              <thead>
+                <tr><th>Fecha</th><th>Tipo</th><th>Trabajador</th><th>Ítem/ID</th><th>Descripción</th><th class="right">Cant.</th><th>Motivo</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- EMPLEADOS -->
+      <section id="view-employees" class="view" hidden>
+        <div class="card">
+          <h2>Empleados (Admin)</h2>
+
+          <div class="grid2">
+            <div class="card inner">
+              <h3>Crear empleado</h3>
+
+              <div class="grid2">
+                <div><label>Nombres</label><input id="empFirst" type="text" /></div>
+                <div><label>Apellidos</label><input id="empLast" type="text" /></div>
+              </div>
+
+              <div class="grid2">
+                <div><label>Correo</label><input id="empEmail" type="email" /></div>
+                <div>
+                  <label>Clave</label>
+                  <div class="password-wrap">
+                    <input id="empPass" type="password" />
+                    <button id="btnToggleEmpPass" class="btn btn--ghost btn-eye" type="button" aria-label="Mostrar/ocultar contraseña">
+                      <svg class="icon-eye" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                        <path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.8"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid2">
+                <div>
+                  <label>Rol</label>
+                  <select id="empRole">
+                    <option value="admin">admin</option>
+                    <option value="operator">operator</option>
+                    <option value="consulta">consulta</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Activo</label>
+                  <select id="empActive">
+                    <option value="true">Sí</option>
+                    <option value="false">No</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row row--wrap">
+                <button id="btnCreateEmployee" class="btn btn--primary" type="button">Crear</button>
+                <button id="btnReloadEmployees" class="btn btn--ghost" type="button">Actualizar</button>
+              </div>
+
+              <div id="empMsg" class="msg info">—</div>
+            </div>
+
+            <div class="card inner">
+              <h3>Lista empleados</h3>
+              <div class="table-wrap">
+                <table id="tblEmployees" class="table">
+                  <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Activo</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ADMIN -->
+      <section id="view-admin" class="view" hidden>
+        <div class="card">
+          <h2>Admin (Corrección de BD)</h2>
+          <div class="msg warn">Herramientas para eliminar registros ingresados por error (solo admin).</div>
+
+          <div class="grid3">
+            <div>
+              <label>Entidad</label>
+              <select id="adminEntity">
+                <option value="assignments">Asignaciones</option>
+                <option value="scrap">Mermas</option>
+                <option value="entries">Entradas</option>
+                <option value="requests">Solicitudes</option>
+                <option value="employees">Trabajadores</option>
+              </select>
+            </div>
+            <div>
+              <label>Ver últimos</label>
+              <select id="adminLimit">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:flex-end;">
+              <button id="btnAdminLoad" class="btn btn--primary" type="button">Cargar</button>
+            </div>
+          </div>
+
+          <div id="adminMsg" class="msg info">—</div>
+
+          <div class="table-wrap">
+            <table id="tblAdmin" class="table">
+              <thead><tr><th>Fecha</th><th>Detalle</th><th class="right">Cant.</th><th>Acción</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </section>
+  </main>
+
+  <script type="module" src="./app.js?v=20260121-fix-1"></script>
 </body>
 </html>
